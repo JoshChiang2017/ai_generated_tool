@@ -11,6 +11,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import textwrap
+from datetime import datetime
 
 # Raw regions data 
 raw_regions = [
@@ -156,7 +157,7 @@ class MemoryMapManager:
         return [r for r in self.regions if r.group == group_name]
 
 
-if __name__ == "__main__":
+def main():
     manager = MemoryMapManager(raw_regions)
     #manager.debug_print()
 
@@ -176,9 +177,9 @@ if __name__ == "__main__":
             ax.bar(x=x_pos, height=y_height, bottom=y_start, width=0.9, alpha=0.6,
                 label=f"(0x{reg.addr:08X}~0x{reg.end:08X}) <{reg.group}> {reg.name}")
 
-            ax.text(x_pos, y_start + y_height / 2, textwrap.fill(reg.name, width=8),
+            ax.text(x_pos, y_start + y_height / 2, textwrap.fill(reg.name, width=10),
                     ha='center', va='center', color='black',
-                    fontsize=10, fontweight='bold')
+                    fontsize=10) # fontweight='bold'
 
     # Group separator lines
     for xpos in manager.get_group_separator_positions():
@@ -213,10 +214,13 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     
-    # Save to outputs directory
-    os.makedirs("outputs", exist_ok=True)
-    output_file = "outputs/memory_map.png"
+    # Save to current directory with timestamped
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = f"memory_map_{timestamp}.png"
     plt.savefig(output_file, dpi=150)
-    print(f"Memory map saved to: {output_file}")
+    print(f"Memory map saved to: {os.path.abspath(output_file)}")
     
     plt.show()
+
+if __name__ == "__main__":
+    main()

@@ -27,12 +27,28 @@ A tool for visualizing memory layout mapping, especially useful for firmware dev
 - Automatically avoid overlapping region conflicts
 - Generate clear memory layout charts
 
+![Memory Map Visualization](docs/images/memory_map_visualizer.png)
+
 **Usage**:
 ```bash
 python memory_map_visualizer.py
 ```
+Uses `data.csv` by default and generates a PNG file.
 
-![Memory Map Visualization](docs/images/memory_map_visualizer.png)
+**Command Line Options**
+
+- `--file/-f <filename>`: Specify input CSV file (default: `data.csv`)
+- `--debug/-d`: Print debug information including filtered CSV content
+
+```bash
+python memory_map_visualizer.py -f custom_data.csv -d
+```
+
+**CSV Format**
+
+- The CSV file should contain the following columns: `group`, `name`, `address`, `size`
+- **Comments**: Use `#` for inline comments
+- **Space Alignment**: Spaces are automatically removed for better readability
 
 **AI Contribution**: GitHub Copilot + ChatGPT (~75% AI generated)
 

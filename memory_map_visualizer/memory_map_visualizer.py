@@ -8,40 +8,56 @@ pip install matplotlib
 """
 
 import os
+import csv
+import argparse
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import textwrap
 from datetime import datetime
+from io import StringIO
 
-# Raw regions data 
-raw_regions = [
-    # rdv3_fw_config.dts
-    ("FW_CONFIG",      "tb_fw-config",   0x0001f300, 0x00000200),
-    ("FW_CONFIG",      "tos_fw-config",  0x0001f500, 0x00001000),
-    ("FW_CONFIG",      "nt_fw-config",   0xF3000000, 0x00100000),
-    # atf_boot info
-    ("atf_boot",       "FW_CONFIG_ID",   0x0001a010, 0x000001bb),
-    ("atf_boot",       "BL2",            0x00090000, 0x000196da),
-    ("atf_boot",       "BL31",           0x0006b000, 0x00018262),
-    ("atf_boot",       "BL32",           0xfa889000, 0x00038620),
-    # rdv3_spmc_sp_manifest.dts
-    ("TOS_FW_CONFIG",  "memory-sp",      0xfa889000, 0x00400000),
-    ("TOS_FW_CONFIG",  "memory-heap",    0xfad00000, 0x00500000),
-    ("TOS_FW_CONFIG",  "ns-memory-sp",   0x80000000, 0x78FE0000),
-    ("TOS_FW_CONFIG",  "ns-memory-cper", 0xFA879000, 0x00010000),
-    ("TOS_FW_CONFIG",  "device-memory",  0x04000000, 0x04000000),
-    ("TOS_FW_CONFIG",  "vm1",            0xFAA00000, 0x00300000),
-    # hafnium boot log
-    ("hafnium",        "data",           0xfa8c1000, 0x000FD000),
-    ("hafnium",        "stacks",         0xfa9c9000, 0x00020000),
-    ("hafnium",        "text",           0xfa889000, 0x0002B000),
-    ("hafnium",        "rodata",         0xfa8b4000, 0x0000D000),
-    # rdv3_stmm_config.dts
-    ("stmm_config",    "heap",           0xfad00000, 0x00500000),
-    ("stmm_config",    "shared-buff",    0xfae89000, 0x00010000),
-    ("stmm_config",    "ns-comm",        0xf3200000, 0x00030000),
-    ("stmm_config",    "cper-buffer",    0xFA879000, 0x00010000),
-]
+# Global debug flag
+DEBUG_MODE = False
+
+def load_regions_from_csv(csv_file):
+    """Load memory regions from CSV file"""
+    raw_regions = []
+    try:
+        with open(csv_file, 'r', encoding='utf-8') as f:
+            # Filter out comment lines and remove inline comments and all spaces
+            filtered_lines = []
+            for line in f:
+                # Remove inline comments (everything after #)
+                if '#' in line:
+                    line = line[:line.index('#')]
+                
+                # Remove all spaces and strip
+                cleaned_line = line.replace(' ', '').strip()
+                if cleaned_line:  # Only add non-empty lines
+                    filtered_lines.append(cleaned_line + '\n')
+            
+            # Create CSV reader from filtered lines
+            csv_content = ''.join(filtered_lines)
+            if DEBUG_MODE:
+                print(csv_content)
+            csv_file_obj = StringIO(csv_content)
+            
+            reader = csv.DictReader(csv_file_obj)
+            
+            for row in reader:
+                group = row['group']
+                name = row['name']
+                address = int(row['address'], 16)  # Convert hex string to int
+                size = int(row['size'], 16)        # Convert hex string to int
+                raw_regions.append((group, name, address, size))
+                
+    except FileNotFoundError:
+        print(f"Error: CSV file '{csv_file}' not found.")
+        return []
+    except ValueError as e:
+        print(f"Error parsing CSV data: {e}")
+        return []
+    return raw_regions
 
 class Region:
     def __init__(self, group, name, addr, size):
@@ -158,8 +174,25 @@ class MemoryMapManager:
 
 
 def main():
+    global DEBUG_MODE
+    
+    parser = argparse.ArgumentParser(description='Memory Map Visualizer')
+    parser.add_argument('--file', '-f', default='data.csv', 
+                       help='CSV file containing memory region data (default: data.csv)')
+    parser.add_argument('--debug', '-d', action='store_true',
+                       help='Print debug information including filtered CSV content')
+    args = parser.parse_args()
+    
+    DEBUG_MODE = args.debug
+    
+    raw_regions = load_regions_from_csv(args.file)
+    if not raw_regions:
+        print("No data loaded. Exiting.")
+        exit(1)
+    
     manager = MemoryMapManager(raw_regions)
-    #manager.debug_print()
+    if DEBUG_MODE:
+        manager.debug_print()
 
     # 2. Draw plot
     fig_width = 6 + len(manager.groups) * 2

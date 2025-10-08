@@ -172,6 +172,25 @@ class MemoryMapManager:
         """Return all regions matching group_name"""
         return [r for r in self.regions if r.group == group_name]
 
+def human_size(n: int) -> str:
+    """
+    Convert a byte count into a human-readable string (B, K, M, G).
+    """
+    # Determine threshold and unit
+    if n >= (1 << 30):
+        v, unit = n / (1 << 30), "G"
+    elif n >= (1 << 20):
+        v, unit = n / (1 << 20), "M"
+    elif n >= (1 << 10):
+        v, unit = n / (1 << 10), "K"
+    else:
+        return f"{n}B"  # Less than 1K, return directly
+
+    # Format and trim trailing zeros and dot
+    s = f"{v:.1f}"
+    if '.' in s:
+        s = s.rstrip('0').rstrip('.')
+    return s + unit
 
 def main():
     global DEBUG_MODE
@@ -207,8 +226,17 @@ def main():
             y_start = manager.addr_to_compressed_y[reg.addr]
             y_height = manager.addr_to_compressed_y[reg.end] - manager.addr_to_compressed_y[reg.addr]
 
-            ax.bar(x=x_pos, height=y_height, bottom=y_start, width=0.9, alpha=0.6,
-                label=f"(0x{reg.addr:08X}~0x{reg.end:08X}) <{reg.group}> {reg.name}")
+            ax.bar(
+                x=x_pos,
+                height=y_height,
+                bottom=y_start,
+                width=0.9,
+                alpha=0.6,
+                label=f"0x{reg.addr:08X}~0x{reg.end:08X}"
+                      f"{f'({human_size(reg.size)})':>8} "
+                      f"<{reg.group}> "
+                      f"{reg.name}"
+            )
 
             ax.text(x_pos, y_start + y_height / 2, textwrap.fill(reg.name, width=10),
                     ha='center', va='center', color='black',
@@ -243,13 +271,13 @@ def main():
     ax.set_ylim(-0.5, len(manager.sorted_key_addresses) - 0.5)
 
     ax.set_title("Memory Map", fontsize=14)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title="Regions (Address & Size)")
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title="Regions (Address & Approx. Size)")
 
     plt.tight_layout()
     
     # Save to current directory with timestamped
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"memory_map_{timestamp}.png"
+    output_file = f"memory_map-{timestamp}.png"
     plt.savefig(output_file, dpi=150)
     print(f"Memory map saved to: {os.path.abspath(output_file)}")
     

@@ -172,6 +172,15 @@ class MemoryMapManager:
         """Return all regions matching group_name"""
         return [r for r in self.regions if r.group == group_name]
 
+    def get_total_track_num(self):
+        """
+        Return the maximum global track index across all groups.
+        Global track = group_base_x[group] + per-group track.
+        """
+        if not self.regions:
+            return 0
+        return max(self.group_base_x[r.group] + r.track for r in self.regions) + 1
+
 def human_size(n: int) -> str:
     """
     Convert a byte count into a human-readable string (B, K, M, G).
@@ -214,8 +223,8 @@ def main():
         manager.debug_print()
 
     # 2. Draw plot
-    fig_width = 6 + len(manager.groups) * 2
-    fig, ax = plt.subplots(figsize=(fig_width, 10))
+    fig_width = 7 + manager.get_total_track_num() # 7 inches for surrounding layout, 1 inch per track
+    fig, ax = plt.subplots(figsize=(fig_width, 10)) # (width, height) in inches, DPI=150
 
     # 3. Draw bars by group
     for group_name in manager.groups:
@@ -281,7 +290,8 @@ def main():
     plt.savefig(output_file, dpi=150)
     print(f"Memory map saved to: {os.path.abspath(output_file)}")
     
-    plt.show()
+    if DEBUG_MODE:
+        plt.show()
 
 if __name__ == "__main__":
     main()

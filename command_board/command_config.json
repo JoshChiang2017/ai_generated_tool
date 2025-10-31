@@ -1,0 +1,96 @@
+{
+  "groups": [
+    {
+      "name": "git",
+      "description": "Quick access to git log across multiple repositories",
+      "subgroups": [
+        {
+          "name": "Grace",
+          "commands": [
+            {
+              "label": "Board",
+              "path": "D:\\work\\Grace\\code\\git2\\",
+              "enabled": true,
+              "actions": [
+                {"name": "log", "executable": "TortoiseGitProc", "argsTemplate": "/command:log /path:{path}"},
+                {"name": "bash", "type": "git-bash"}
+              ]
+            }
+          ]
+        },
+        {
+          "name": "vera",
+          "commands": [
+            {
+              "label": "Kernel",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "revert",
+                  "executable": "git-insyde-helper.bat",
+                  "argsTemplate": "r {path}"
+                }
+              ]
+            },
+            {
+              "label": "Board",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\VeraMultiBoardPkg\\",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
+                },
+                {
+                  "name": "bash",
+                  "type": "git-bash"
+                }
+              ]
+            },
+            {
+              "label": "stmm",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\StandaloneMmBoardPkg\\",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
+                },
+                {
+                  "name": "bash",
+                  "type": "git-bash"
+                }
+              ]
+            },
+            {
+              "label": "chipset",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Nvidia\\",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
+                },
+                {
+                  "name": "bash",
+                  "type": "git-bash"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "windowTitle": "Command Board",
+    "buttonWidth": 30,
+    "logOnClick": true,
+    "logFile": "action.log",
+    "closeOnAction": false
+  }
+}

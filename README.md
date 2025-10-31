@@ -54,6 +54,37 @@ python memory_map_visualizer.py -f custom_data.csv -d
 
 ---
 
+### 🧭 Command Board (GUI Launcher)
+Location: `command_board/`
+
+Quick multi-repository & folder action launcher (Git logs, Git Bash, helper scripts, folder open) driven by a JSON config.
+
+Core points:
+- Data-driven tabs/groups/subgroups
+- Multiple actions per row (log / bash / helper / open)
+- Logging to `action.log` anchored in its directory
+- Default: does NOT auto-close; use `-c` / `--auto-close` to close after a successful action
+- CLI support: list / run / dry-run
+
+Run examples:
+```powershell
+python command_board\main.py -l
+python command_board\main.py -r git/vera/Kernel/helper -d
+python command_board\main.py -c
+```
+
+Config snippet:
+```jsonc
+{
+	"groups": [ { "name": "git", "subgroups": [ /* ... */ ] } ],
+	"settings": { "logFile": "action.log", "closeOnAction": false }
+}
+```
+
+Add actions by appending objects to a command's `actions` array. Use `"type": "git-bash"` for Git Bash, otherwise specify `executable` + `argsTemplate`.
+
+---
+
 ## Adding New Tools Guide
 
 ### File Naming Convention

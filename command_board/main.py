@@ -2,9 +2,11 @@ import json
 import os
 import subprocess
 import sys
+import shutil
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Dict, Any, List, Tuple
+# Removed unused import (test)
+from typing import Dict, Any, List, Tuple, Set
 import argparse
 from action_logger import get_logger
 
@@ -39,9 +41,12 @@ class CommandBoardApp(tk.Tk):
         self._build_ui()
 
     def _build_ui(self):
-        # Removed top-level reload/open controls per user request
-        spacer = ttk.Frame(self)
-        spacer.pack(fill='x', padx=8, pady=(4,0))
+        # Top control bar (adds Test button)
+        control_bar = ttk.Frame(self)
+        control_bar.pack(fill='x', padx=8, pady=(6, 0))
+        test_btn = ttk.Button(control_bar, text='Test', command=self.run_tests)
+        test_btn.pack(side='left')
+        ttk.Label(control_bar, text='Config health check', foreground='#555').pack(side='left', padx=8)
 
         # Notebook for groups
         notebook = ttk.Notebook(self)
@@ -167,6 +172,45 @@ class CommandBoardApp(tk.Tk):
                 return c
         return ''
 
+    # ===================== Validation / Test Button =====================
+    def run_tests(self):
+        git_bash_path = self._resolve_git_bash()
+        report = validate_config(self.config_data, git_bash_path=git_bash_path, logger=self.logger)
+        self.logger.log('CONFIG_TEST', 'started', status='INFO')
+        missing_paths = report['missing_paths']
+        missing_execs = report['missing_executables']
+        total_cmds = report['total_commands']
+        total_actions = report['total_actions']
+        # Log each missing item individually for easier grep
+        # Already logged each check; still log aggregate missing items for quick grep
+        for p in sorted(missing_paths):
+            self.logger.log('CONFIG_TEST_PATH_MISSING', p, status='WARN')
+        for e in sorted(missing_execs):
+            self.logger.log('CONFIG_TEST_EXEC_MISSING', e, status='WARN')
+        lines: List[str] = []
+        lines.append(f'Total commands: {total_cmds}')
+        lines.append(f'Total actions: {total_actions}')
+        lines.append(f'Missing paths: {len(missing_paths)}')
+        for p in sorted(missing_paths):
+            lines.append(f'  PATH ! {p}')
+        lines.append(f'Missing executables: {len(missing_execs)}')
+        for e in sorted(missing_execs):
+            lines.append(f'  EXEC ! {e}')
+        summary = '\n'.join(lines)
+        status = 'OK' if not missing_paths and not missing_execs else 'WARN'
+        self.logger.log('CONFIG_TEST_RESULT', summary.replace('\n', ' | '), status=status)
+        if not missing_paths and not missing_execs:
+            messagebox.showinfo('Config Test', 'All OK!\n\n' + summary)
+        else:
+            # Show detailed window
+            win = tk.Toplevel(self)
+            win.title('Config Test Report')
+            txt = tk.Text(win, width=100, height=30)
+            txt.pack(fill='both', expand=True)
+            txt.insert('1.0', summary)
+            txt.config(state='disabled')
+            ttk.Button(win, text='Close', command=win.destroy).pack(pady=6)
+
 
 def load_config(path: str) -> Dict[str, Any]:
     if not os.path.exists(path):
@@ -201,6 +245,119 @@ def iter_commands(config: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
                     out.append((full_label, {'_base': cmd, '_action': act}))
     return out
 
+def _collect_executable(action: Dict[str, Any]) -> str:
+    # For git-bash type we treat executable specially
+    if action.get('type') == 'git-bash' or action.get('name') == 'bash':
+        return 'git-bash'
+    exe = action.get('executable')
+    return exe or ''
+
+def validate_config(config: Dict[str, Any], git_bash_path: str = '', logger=None) -> Dict[str, Any]:
+    """Validate paths and executables referenced in config without creating GUI.
+    Optionally logs each check (success or failure) if logger provided.
+    Returns dict with sets of missing items and counts.
+    Rules:
+      - A command path must exist (file or directory) unless empty.
+      - Executable is checked via shutil.which; special cases:
+          * explorer: assumed available on Windows.
+          * git-bash: caller provides resolved git-bash path.
+          * *.bat / *.cmd: if not in PATH, also check current working dir & script dir.
+    Log events:
+      CONFIG_TEST_PATH_CHECK: <label> | <expanded-path> | OK/MISSING
+      CONFIG_TEST_EXEC_CHECK: <exe> | <location or reason> | OK/MISSING
+    """
+    missing_paths: Set[str] = set()
+    missing_execs: Set[str] = set()
+    seen_execs: Set[str] = set()
+    total_commands = 0
+    total_actions = 0
+    for label, pair in iter_commands(config):
+        total_actions += 1
+        base = pair.get('_base', {})
+        action = pair.get('_action', {})
+        path = base.get('path')
+        if path:
+            expanded = os.path.expandvars(path)
+            exists = os.path.exists(expanded)
+            if not exists:
+                missing_paths.add(f'{label} -> {expanded}')
+                if logger:
+                    logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | MISSING', status='WARN')
+            else:
+                if logger:
+                    logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | OK', status='OK')
+        exe = _collect_executable(action)
+        if exe and exe not in seen_execs:
+            seen_execs.add(exe)
+            if exe.lower() == 'explorer':
+                if logger:
+                    logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | OK (assumed)', status='OK')
+            elif exe == 'git-bash':
+                if not git_bash_path:
+                    missing_execs.add('git-bash (git-bash.exe not found)')
+                    if logger:
+                        logger.log('CONFIG_TEST_EXEC_CHECK', 'git-bash | MISSING', status='WARN')
+                else:
+                    if logger:
+                        logger.log('CONFIG_TEST_EXEC_CHECK', f'git-bash | {git_bash_path} | OK', status='OK')
+            else:
+                found = shutil.which(exe)
+                if not found:
+                    if exe.lower().endswith(('.bat', '.cmd')):
+                        candidates = [os.path.join(os.getcwd(), exe), os.path.join(os.path.dirname(__file__), exe)]
+                        if not any(os.path.exists(c) for c in candidates):
+                            missing_execs.add(exe)
+                            if logger:
+                                logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | MISSING', status='WARN')
+                        else:
+                            if logger:
+                                logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | {candidates} | OK', status='OK')
+                    else:
+                        missing_execs.add(exe)
+                        if logger:
+                            logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | MISSING', status='WARN')
+                else:
+                    if logger:
+                        logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | {found} | OK', status='OK')
+    base_signatures: Set[str] = set()
+    for group in config.get('groups', []):
+        subgroups = group.get('subgroups')
+        if subgroups:
+            for sg in subgroups:
+                for cmd in sg.get('commands', []):
+                    if not cmd.get('enabled', True):
+                        continue
+                    sig = f"{cmd.get('label')}|{cmd.get('path')}"
+                    base_signatures.add(sig)
+        else:
+            for cmd in group.get('commands', []):
+                if not cmd.get('enabled', True):
+                    continue
+                sig = f"{cmd.get('label')}|{cmd.get('path')}"
+                base_signatures.add(sig)
+    total_commands = len(base_signatures)
+    return {
+        'missing_paths': missing_paths,
+        'missing_executables': missing_execs,
+        'total_commands': total_commands,
+        'total_actions': total_actions,
+    }
+
+def resolve_git_bash_executable(config: Dict[str, Any]) -> str:
+    """Standalone git-bash path resolution without creating a Tk window."""
+    setting_path = config.get('settings', {}).get('gitBashExecutable')
+    candidates: List[str] = []
+    if setting_path:
+        candidates.append(setting_path)
+    candidates.extend([
+        r"C:\Program Files\Git\git-bash.exe",
+        r"C:\Program Files (x86)\Git\git-bash.exe"
+    ])
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return ''
+
 def build_command_string(cmd_def: Dict[str, Any]) -> str:
     if CommandBuilder:
         builder = CommandBuilder(cmd_def)
@@ -219,6 +376,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument('-r', '--run', metavar='LABEL', help='Run a command by its label')
     parser.add_argument('-d', '--dry-run', action='store_true', help='Show command string without executing')
     parser.add_argument('-c', '--auto-close', action='store_true', help='Auto-close GUI after successful action (override config)')
+    parser.add_argument('-t', '--test-config', action='store_true', help='Validate config (paths & executables) and exit')
     return parser.parse_args(argv[1:])
 
 def main(argv: List[str]):
@@ -229,6 +387,39 @@ def main(argv: List[str]):
     except Exception as e:
         print(f'Failed to load config: {e}', file=sys.stderr)
         sys.exit(1)
+
+    if getattr(args, 'test_config', False):
+        # Perform validation only (CLI mode) with logging
+        logger = get_logger(resolve_log_path(config.get('settings', {})))
+        logger.log('CONFIG_TEST', 'cli started', status='INFO')
+        git_bash_path = resolve_git_bash_executable(config)
+        report = validate_config(config, git_bash_path=git_bash_path, logger=logger)
+        missing_paths = report['missing_paths']
+        missing_execs = report['missing_executables']
+        total_cmds = report['total_commands']
+        total_actions = report['total_actions']
+        for p in sorted(missing_paths):
+            logger.log('CONFIG_TEST_PATH_MISSING', p, status='WARN')
+        for e in sorted(missing_execs):
+            logger.log('CONFIG_TEST_EXEC_MISSING', e, status='WARN')
+        print('CONFIG VALIDATION SUMMARY')
+        print(f'  Total commands : {total_cmds}')
+        print(f'  Total actions  : {total_actions}')
+        print(f'  Missing paths  : {len(missing_paths)}')
+        for p in sorted(missing_paths):
+            print(f'    PATH ! {p}')
+        print(f'  Missing execs  : {len(missing_execs)}')
+        for e in sorted(missing_execs):
+            print(f'    EXEC ! {e}')
+        if not missing_paths and not missing_execs:
+            print('Result: OK')
+            logger.log('CONFIG_TEST_RESULT', 'OK', status='OK')
+            sys.exit(0)
+        else:
+            print('Result: WARN (issues found)')
+            logger.log('CONFIG_TEST_RESULT', f'WARN paths={len(missing_paths)} execs={len(missing_execs)}', status='WARN')
+            sys.exit(4)
+            sys.exit(4)
 
     if args.list:
         print('Available commands:')

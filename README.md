@@ -65,13 +65,21 @@ Core points:
 - Logging to `action.log` anchored in its directory
 - Default: does NOT auto-close; use `-c` / `--auto-close` to close after a successful action
 - CLI support: list / run / dry-run
+- Config validation: GUI Test button or `--test-config` flag
 
 Run examples:
 ```powershell
 python command_board\main.py -l
 python command_board\main.py -r git/vera/Kernel/helper -d
 python command_board\main.py -c
+python command_board\main.py --test-config
 ```
+
+`--test-config` / Test button report includes:
+- Total commands & actions
+- Missing paths (with label)
+- Missing executables
+Exit code: 0 if all OK, 4 if any issue.
 
 Config snippet:
 ```jsonc

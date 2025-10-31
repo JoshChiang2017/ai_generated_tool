@@ -150,23 +150,22 @@ class CommandBoardApp(tk.Tk):
         path = base_cmd.get('path')
         act_name = action.get('name', 'action')
         self.logger.log('BUTTON_CLICK', f'{label_tuple} -> {act_name}', status='INFO')
-        # Git Bash action
-        if act_name == 'bash' or action.get('type') == 'git-bash':
-            result = self.open_git_bash(base_cmd, label_tuple)
-            if result and self.close_on_action:
-                self.logger.log('APP_CLOSE', 'Auto-close after bash action', status='INFO')
-                self.after(100, self.destroy)
-            return result
-        exe = action.get('executable')
+        exe = resolve_executable(action, self.config_data, self.logger)
         args_template = action.get('argsTemplate', '')
         if not exe or not path:
             self.logger.log('EXECUTE', f'MISSING executable/path {action}', status='ERROR')
             messagebox.showerror('Error', f'Missing executable/path for action {act_name}')
             return
         final_args = args_template.format(path=path)
-        full_cmd = f"{exe} {final_args}".strip()
+        # Quote exe if contains spaces
+        quoted_exe = f'"{exe}"' if ' ' in exe and not exe.startswith('"') else exe
+        full_cmd = f"{quoted_exe} {final_args}".strip()
         try:
-            subprocess.Popen(full_cmd, shell=True)
+            # Use list form if no template shell expansions needed
+            if ' ' in final_args or '%' in final_args:
+                subprocess.Popen(full_cmd, shell=True)
+            else:
+                subprocess.Popen([exe] + ([final_args] if final_args else []))
             self.logger.log('EXECUTE', f'{full_cmd}', status='OK')
             if self.close_on_action:
                 self.logger.log('APP_CLOSE', 'Auto-close after execute action', status='INFO')
@@ -180,47 +179,9 @@ class CommandBoardApp(tk.Tk):
 
     # Removed reload_config and open_config per user request
 
-    def open_git_bash(self, cmd: Dict[str, Any], label_tuple=None):
-        path = cmd.get('path')
-        if not path:
-            self.logger.log('GIT_BASH', 'Missing path', status='ERROR')
-            messagebox.showerror('Git Bash', 'Missing path for Git Bash launch')
-            return False
-        git_bash_exe = self._resolve_git_bash()
-        if not git_bash_exe:
-            self.logger.log('GIT_BASH', 'Executable not found', status='ERROR')
-            messagebox.showerror('Git Bash', 'Could not locate Git Bash executable. Set settings.gitBashExecutable or install Git for Windows.')
-            return False
-        try:
-            # Prefer direct invocation without shell; Git Bash supports --cd argument.
-            cmd_line = [git_bash_exe, f'--cd={path}']
-            subprocess.Popen(cmd_line)
-            self.logger.log('GIT_BASH', f'{git_bash_exe} --cd={path}', status='OK')
-            return True
-        except Exception as e:
-            self.logger.log('GIT_BASH', f'ERROR {e}', status='ERROR')
-            messagebox.showerror('Git Bash Launch Failed', str(e))
-            return False
-
-    def _resolve_git_bash(self) -> str:
-        # Priority: config setting -> common install paths
-        setting_path = self.config_data.get('settings', {}).get('gitBashExecutable')
-        candidates = []
-        if setting_path:
-            candidates.append(setting_path)
-        candidates.extend([
-            r"C:\Program Files\Git\git-bash.exe",
-            r"C:\Program Files (x86)\Git\git-bash.exe"
-        ])
-        for c in candidates:
-            if c and os.path.exists(c):
-                return c
-        return ''
-
     # ===================== Validation / Test Button =====================
     def run_tests(self):
-        git_bash_path = self._resolve_git_bash()
-        report = validate_config(self.config_data, git_bash_path=git_bash_path, logger=self.logger)
+        report = validate_config(self.config_data, logger=self.logger)
         self.logger.log('CONFIG_TEST', 'started', status='INFO')
         missing_paths = report['missing_paths']
         missing_execs = report['missing_executables']
@@ -291,13 +252,10 @@ def iter_commands(config: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
     return out
 
 def _collect_executable(action: Dict[str, Any]) -> str:
-    # For git-bash type we treat executable specially
-    if action.get('type') == 'git-bash' or action.get('name') == 'bash':
-        return 'git-bash'
-    exe = action.get('executable')
+    exe = action.get('executable') or action.get('executableAlias')
     return exe or ''
 
-def validate_config(config: Dict[str, Any], git_bash_path: str = '', logger=None) -> Dict[str, Any]:
+def validate_config(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
     """Validate paths and executables referenced in config without creating GUI.
     Optionally logs each check (success or failure) if logger provided.
     Returns dict with sets of missing items and counts.
@@ -305,8 +263,7 @@ def validate_config(config: Dict[str, Any], git_bash_path: str = '', logger=None
       - A command path must exist (file or directory) unless empty.
       - Executable is checked via shutil.which; special cases:
           * explorer: assumed available on Windows.
-          * git-bash: caller provides resolved git-bash path.
-          * *.bat / *.cmd: if not in PATH, also check current working dir & script dir.
+          * *.bat / *.cmd or absolute path: if not in PATH but file exists at given path treat OK.
     Log events:
       CONFIG_TEST_PATH_CHECK: <label> | <expanded-path> | OK/MISSING
       CONFIG_TEST_EXEC_CHECK: <exe> | <location or reason> | OK/MISSING
@@ -332,31 +289,37 @@ def validate_config(config: Dict[str, Any], git_bash_path: str = '', logger=None
                 if logger:
                     logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | OK', status='OK')
         exe = _collect_executable(action)
+        # Resolve alias to real path if alias provided
+        if exe and action.get('executableAlias') and 'aliases' in config:
+            real = config.get('aliases', {}).get(action.get('executableAlias'))
+            if real:
+                if logger:
+                    logger.log('CONFIG_TEST_ALIAS_RESOLVE', f"{action.get('executableAlias')} -> {real}", status='OK')
+                exe = real
+            else:
+                if logger:
+                    logger.log('ALIAS_MISSING', action.get('executableAlias'), status='WARN')
         if exe and exe not in seen_execs:
             seen_execs.add(exe)
             if exe.lower() == 'explorer':
                 if logger:
                     logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | OK (assumed)', status='OK')
-            elif exe == 'git-bash':
-                if not git_bash_path:
-                    missing_execs.add('git-bash (git-bash.exe not found)')
-                    if logger:
-                        logger.log('CONFIG_TEST_EXEC_CHECK', 'git-bash | MISSING', status='WARN')
-                else:
-                    if logger:
-                        logger.log('CONFIG_TEST_EXEC_CHECK', f'git-bash | {git_bash_path} | OK', status='OK')
             else:
                 found = shutil.which(exe)
                 if not found:
-                    if exe.lower().endswith(('.bat', '.cmd')):
+                    # Absolute path or relative file existence check
+                    if os.path.isabs(exe) and os.path.exists(exe):
+                        if logger:
+                            logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | (absolute) | OK', status='OK')
+                    elif exe.lower().endswith(('.bat', '.cmd')):
                         candidates = [os.path.join(os.getcwd(), exe), os.path.join(os.path.dirname(__file__), exe)]
-                        if not any(os.path.exists(c) for c in candidates):
+                        if any(os.path.exists(c) for c in candidates):
+                            if logger:
+                                logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | {candidates} | OK', status='OK')
+                        else:
                             missing_execs.add(exe)
                             if logger:
                                 logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | MISSING', status='WARN')
-                        else:
-                            if logger:
-                                logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | {candidates} | OK', status='OK')
                     else:
                         missing_execs.add(exe)
                         if logger:
@@ -389,30 +352,35 @@ def validate_config(config: Dict[str, Any], git_bash_path: str = '', logger=None
     }
 
 def resolve_git_bash_executable(config: Dict[str, Any]) -> str:
-    """Standalone git-bash path resolution without creating a Tk window."""
-    setting_path = config.get('settings', {}).get('gitBashExecutable')
-    candidates: List[str] = []
-    if setting_path:
-        candidates.append(setting_path)
-    candidates.extend([
-        r"C:\Program Files\Git\git-bash.exe",
-        r"C:\Program Files (x86)\Git\git-bash.exe"
-    ])
-    for c in candidates:
-        if c and os.path.exists(c):
-            return c
+    """Deprecated: kept for backward compatibility, now unused."""
     return ''
 
 def build_command_string(cmd_def: Dict[str, Any]) -> str:
     if CommandBuilder:
         builder = CommandBuilder(cmd_def)
         return builder.build()
-    exe = cmd_def.get('executable')
+    exe = cmd_def.get('executable') or cmd_def.get('executableAlias')
+    # If alias, cannot resolve here without config; callers should pass resolved
     path = cmd_def.get('path')
     template = cmd_def.get('argsTemplate', '')
     if not exe or not path:
         raise ValueError('Executable or path missing')
     return f"{exe} {template.format(path=path)}".strip()
+
+def resolve_executable(action: Dict[str, Any], config: Dict[str, Any], logger=None) -> str:
+    """Return executable path resolving alias if present."""
+    exe = action.get('executable')
+    alias = action.get('executableAlias')
+    if alias:
+        real = config.get('aliases', {}).get(alias)
+        if real:
+            if logger:
+                logger.log('ALIAS_RESOLVE', f'{alias} -> {real}', status='INFO')
+            exe = real
+        else:
+            if logger:
+                logger.log('ALIAS_MISSING', alias, status='WARN')
+    return exe or ''
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Command Board GUI / CLI')
@@ -420,8 +388,9 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument('-l', '--list', action='store_true', help='List all commands and exit')
     parser.add_argument('-r', '--run', metavar='LABEL', help='Run a command by its label')
     parser.add_argument('-d', '--dry-run', action='store_true', help='Show command string without executing')
-    parser.add_argument('-c', '--auto-close', action='store_true', help='Auto-close GUI after successful action (override config)')
+    parser.add_argument('-o', '--one-shot', action='store_true', help='Close GUI after first successful action (override config)')
     parser.add_argument('-t', '--test-config', action='store_true', help='Validate config (paths & executables) and exit')
+    parser.add_argument('-x', '--auto-exit', metavar='SECONDS', type=int, help='Auto-exit GUI after SECONDS (forces non-blocking usage)')
     return parser.parse_args(argv[1:])
 
 def main(argv: List[str]):
@@ -437,8 +406,7 @@ def main(argv: List[str]):
         # Perform validation only (CLI mode) with logging
         logger = get_logger(resolve_log_path(config.get('settings', {})))
         logger.log('CONFIG_TEST', 'cli started', status='INFO')
-        git_bash_path = resolve_git_bash_executable(config)
-        report = validate_config(config, git_bash_path=git_bash_path, logger=logger)
+        report = validate_config(config, logger=logger)
         missing_paths = report['missing_paths']
         missing_execs = report['missing_executables']
         total_cmds = report['total_commands']
@@ -472,13 +440,11 @@ def main(argv: List[str]):
             base = pair.get('_base', {})
             action = pair.get('_action', {})
             path = base.get('path')
-            if action.get('type') == 'git-bash' or action.get('name') == 'bash':
-                cmd_str = f'git-bash --cd={path}'
-            else:
-                try:
-                    cmd_str = build_command_string({'executable': action.get('executable'), 'argsTemplate': action.get('argsTemplate'), 'path': path})
-                except Exception as e:
-                    cmd_str = f'<invalid: {e}>'
+            resolved_exe = resolve_executable(action, config)
+            try:
+                cmd_str = build_command_string({'executable': resolved_exe, 'argsTemplate': action.get('argsTemplate'), 'path': path})
+            except Exception as e:
+                cmd_str = f'<invalid: {e}>'
             print(f' - {label}: {cmd_str}')
         return
     if args.run:
@@ -491,29 +457,9 @@ def main(argv: List[str]):
         base = pair.get('_base', {})
         action = pair.get('_action', {})
         path = base.get('path')
-        if action.get('type') == 'git-bash' or action.get('name') == 'bash':
-            cmd_str = f'git-bash --cd={path}'
-            if args.dry_run:
-                print(f'DRY RUN: {cmd_str}')
-                logger = get_logger(resolve_log_path(config.get('settings', {})))
-                logger.log('CLI_DRY_RUN', f'{label} -> {cmd_str}', status='INFO')
-                return
-            gb_exe = CommandBoardApp(config)._resolve_git_bash()
-            if not gb_exe:
-                print('Git Bash executable not found', file=sys.stderr)
-                sys.exit(3)
-            try:
-                subprocess.Popen([gb_exe, f'--cd={path}'])
-                print(f'Executed: {cmd_str}')
-                logger = get_logger(resolve_log_path(config.get('settings', {})))
-                logger.log('CLI_EXECUTE', f'{label} -> {cmd_str}', status='OK')
-            except Exception as e:
-                print(f'Execution failed: {e}', file=sys.stderr)
-                logger = get_logger(resolve_log_path(config.get('settings', {})))
-                logger.log('CLI_EXECUTE', f'{label} ERROR {e}', status='ERROR')
-                sys.exit(3)
-            return
-        cmd_str = build_command_string({'executable': action.get('executable'), 'argsTemplate': action.get('argsTemplate'), 'path': path})
+        exe = resolve_executable(action, config)
+        template = action.get('argsTemplate')
+        cmd_str = build_command_string({'executable': exe, 'argsTemplate': template, 'path': path})
         if args.dry_run:
             print(f'DRY RUN: {cmd_str}')
             logger = get_logger(resolve_log_path(config.get('settings', {})))
@@ -531,10 +477,15 @@ def main(argv: List[str]):
             sys.exit(3)
         return
 
-    # If auto-close flag provided, force closeOnAction true
-    if getattr(args, 'auto_close', False):
+    # If one-shot provided, force closeOnAction true
+    if getattr(args, 'one_shot', False):
         config.setdefault('settings', {})['closeOnAction'] = True
     app = CommandBoardApp(config)
+    if getattr(args, 'auto_exit', None):
+        seconds = max(0, args.auto_exit)
+        ms = seconds * 1000
+        app.logger.log('APP_AUTO_EXIT_SCHEDULED', f'exiting in {seconds}s', status='INFO')
+        app.after(ms, lambda: (app.logger.log('APP_AUTO_EXIT', 'auto exit trigger', status='INFO'), app.destroy()))
     app.mainloop()
 
 if __name__ == '__main__':

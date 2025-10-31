@@ -13,7 +13,7 @@
               "enabled": true,
               "actions": [
                 {"name": "log", "executable": "TortoiseGitProc", "argsTemplate": "/command:log /path:{path}"},
-                {"name": "bash", "type": "git-bash"}
+                {"name": "bash", "executableAlias": "git_bash", "argsTemplate": "--cd={path}"}
               ]
             }
           ]
@@ -45,7 +45,8 @@
                 },
                 {
                   "name": "bash",
-                  "type": "git-bash"
+                  "executableAlias": "git_bash",
+                  "argsTemplate": "--cd={path}"
                 }
               ]
             },
@@ -61,7 +62,8 @@
                 },
                 {
                   "name": "bash",
-                  "type": "git-bash"
+                  "executableAlias": "git_bash",
+                  "argsTemplate": "--cd={path}"
                 }
               ]
             },
@@ -77,7 +79,8 @@
                 },
                 {
                   "name": "bash",
-                  "type": "git-bash"
+                  "executableAlias": "git_bash",
+                  "argsTemplate": "--cd={path}"
                 }
               ]
             }
@@ -153,5 +156,8 @@
     "logOnClick": true,
     "logFile": "action.log",
     "closeOnAction": false
+  },
+  "aliases": {
+    "git_bash": "C:\\Program Files\\Git\\git-bash.exe"
   }
 }

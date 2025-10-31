@@ -10,6 +10,34 @@ from typing import Dict, Any, List, Tuple, Set
 import argparse
 from action_logger import get_logger
 
+# Tooltip helper (re-added)
+class _Tooltip:
+    def __init__(self, widget, text: str):
+        self.widget = widget
+        self.text = text
+        self.tip = None
+        widget.bind('<Enter>', self._show)
+        widget.bind('<Leave>', self._hide)
+
+    def _show(self, _event=None):
+        if self.tip or not self.text:
+            return
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() + 6
+        y = self.widget.winfo_rooty() + 4
+        self.tip = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f'+{x}+{y}')
+        lbl = tk.Label(tw, text=self.text, background='#ffffe0', borderwidth=1, relief='solid', font=('Segoe UI', 9))
+        lbl.pack(ipadx=4, ipady=2)
+
+    def _hide(self, _event=None):
+        if self.tip:
+            self.tip.destroy()
+            self.tip = None
+
+def create_tooltip(widget, text: str):
+    _Tooltip(widget, text)
+
 try:
     from core import CommandBuilder
 except ImportError:
@@ -41,15 +69,32 @@ class CommandBoardApp(tk.Tk):
         self._build_ui()
 
     def _build_ui(self):
-        # Top control bar (adds Test button)
+        # Top control bar (Test button moved right & de-emphasized)
         control_bar = ttk.Frame(self)
         control_bar.pack(fill='x', padx=8, pady=(6, 0))
-        test_btn = ttk.Button(control_bar, text='Test', command=self.run_tests)
-        test_btn.pack(side='left')
-        ttk.Label(control_bar, text='Config health check', foreground='#555').pack(side='left', padx=8)
+        # Left spacer (remove window title from body)
+        ttk.Frame(control_bar).pack(side='left', padx=4)
+        # Right side container
+        right_box = ttk.Frame(control_bar)
+        right_box.pack(side='right')
+        test_btn = ttk.Button(right_box, text='⚙', width=3, command=self.run_tests)
+        test_btn.pack(side='right', padx=(4,0))
+        # Tooltip for test button
+        create_tooltip(test_btn, 'TEST')
 
-        # Notebook for groups
-        notebook = ttk.Notebook(self)
+        # === Notebook Style Enhancement for clearer tab separation ===
+        style = ttk.Style(self)
+        current_theme = style.theme_use()
+        # Configure custom notebook & tab style
+        style.configure('CB.TNotebook', tabmargins=(8, 4, 8, 0))  # left/top/right/bottom extra spacing
+        style.configure('CB.TNotebook.Tab', padding=(14, 6), borderwidth=1)
+        # Use map to differentiate selected vs unselected
+        style.map('CB.TNotebook.Tab',
+                  background=[('selected', '#ffffff'), ('!selected', '#e6e6e6')],
+                  foreground=[('selected', '#000000'), ('!selected', '#444444')])
+
+        # Notebook for groups with custom style
+        notebook = ttk.Notebook(self, style='CB.TNotebook')
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
 
         for group in self.config_data.get('groups', []):

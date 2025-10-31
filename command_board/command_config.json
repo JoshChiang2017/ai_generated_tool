@@ -85,6 +85,67 @@
         }
       ]
     }
+    ,
+    {
+      "name": "folder",
+      "description": "Open frequently used folders",
+      "subgroups": [
+        {
+          "name": "Grace",
+          "commands": [
+            {
+              "label": "sync",
+              "tier": "primary",
+              "path": "D:\\sync\\Grace\\",
+              "enabled": true,
+              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+            },
+            {
+              "label": "work",
+              "tier": "primary",
+              "path": "D:\\work\\Grace\\",
+              "enabled": true,
+              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+            },
+            {
+              "label": "code",
+              "tier": "primary",
+              "path": "D:\\work\\Grace\\code\\git2\\",
+              "enabled": true,
+              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+            },
+            {
+              "label": "spec",
+              "tier": "secondary",
+              "path": "D:\\work\\Grace\\vendor_data\\spec\\grace\\",
+              "enabled": true,
+              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+            },
+            {
+              "label": "platform_info",
+              "tier": "secondary",
+              "path": "D:\\sync\\Grace\\generated_data\\platform\\",
+              "enabled": true,
+              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+            }
+          ]
+        },
+        {
+          "name": "vera",
+          "commands": [
+            {
+              "label": "code",
+              "tier": "primary",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
+              "enabled": true,
+              "actions": [
+                { "name": "open", "executable": "explorer", "argsTemplate": "{path}" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
   ],
   "settings": {
     "windowTitle": "Command Board",

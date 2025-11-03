@@ -152,11 +152,12 @@ class CommandBoardApp(tk.Tk):
         self.logger.log('BUTTON_CLICK', f'{label_tuple} -> {act_name}', status='INFO')
         exe = resolve_executable(action, self.config_data, self.logger)
         args_template = action.get('argsTemplate', '')
-        if not exe or not path:
+        needs_path = '{path}' in args_template
+        if not exe or (needs_path and not path):
             self.logger.log('EXECUTE', f'MISSING executable/path {action}', status='ERROR')
             messagebox.showerror('Error', f'Missing executable/path for action {act_name}')
             return
-        final_args = args_template.format(path=path)
+        final_args = args_template.format(path=path) if args_template else ''
         # Quote exe if contains spaces
         quoted_exe = f'"{exe}"' if ' ' in exe and not exe.startswith('"') else exe
         full_cmd = f"{quoted_exe} {final_args}".strip()
@@ -288,6 +289,23 @@ def validate_config(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
             else:
                 if logger:
                     logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | OK', status='OK')
+        else:
+            # If no base path, attempt to detect a direct absolute path inside argsTemplate (e.g. explorer C:\foo\bar\)
+            tmpl = action.get('argsTemplate', '') or ''
+            if tmpl and '{path}' not in tmpl:
+                # Heuristic: take first token that looks like an absolute Windows path
+                # Simple pattern: starts with drive letter and \\ or contains \\ after drive.
+                token = tmpl.strip().split()[0]
+                candidate = token
+                if len(candidate) > 2 and candidate[1] == ':' and ('\\' in candidate or '/' in candidate):
+                    expanded = os.path.expandvars(candidate)
+                    if not os.path.exists(expanded):
+                        missing_paths.add(f'{label} -> {expanded} (argsTemplate)')
+                        if logger:
+                            logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} (tmpl) | MISSING', status='WARN')
+                    else:
+                        if logger:
+                            logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} (tmpl) | OK', status='OK')
         exe = _collect_executable(action)
         # Resolve alias to real path if alias provided
         if exe and action.get('executableAlias') and 'aliases' in config:
@@ -356,16 +374,18 @@ def resolve_git_bash_executable(config: Dict[str, Any]) -> str:
     return ''
 
 def build_command_string(cmd_def: Dict[str, Any]) -> str:
+    """Build command allowing optional path when template lacks {path}."""
     if CommandBuilder:
-        builder = CommandBuilder(cmd_def)
-        return builder.build()
+        return CommandBuilder(cmd_def).build()
     exe = cmd_def.get('executable') or cmd_def.get('executableAlias')
-    # If alias, cannot resolve here without config; callers should pass resolved
+    template = cmd_def.get('argsTemplate', '') or ''
     path = cmd_def.get('path')
-    template = cmd_def.get('argsTemplate', '')
-    if not exe or not path:
-        raise ValueError('Executable or path missing')
-    return f"{exe} {template.format(path=path)}".strip()
+    if not exe:
+        raise ValueError('Executable missing')
+    if '{path}' in template and not path:
+        raise ValueError('Path placeholder present but path missing')
+    args = template.format(path=path) if template else ''
+    return f"{exe} {args}".strip()
 
 def resolve_executable(action: Dict[str, Any], config: Dict[str, Any], logger=None) -> str:
     """Return executable path resolving alias if present."""

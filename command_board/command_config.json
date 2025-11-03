@@ -97,18 +97,13 @@
           "name": "Grace",
           "commands": [
             {
-              "label": "sync",
+              "label": "root",
               "tier": "primary",
-              "path": "D:\\sync\\Grace\\",
               "enabled": true,
-              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
-            },
-            {
-              "label": "work",
-              "tier": "primary",
-              "path": "D:\\work\\Grace\\",
-              "enabled": true,
-              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+              "actions": [
+                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\" },
+                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Grace\\" }
+              ]
             },
             {
               "label": "code",
@@ -120,22 +115,35 @@
             {
               "label": "spec",
               "tier": "secondary",
-              "path": "D:\\work\\Grace\\vendor_data\\spec\\grace\\",
               "enabled": true,
-              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+              "actions": [
+                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\vendor_data\\spec\\grace\\" },
+                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Grace\\vendor_data\\spec\\grace\\" }
+              ]
             },
             {
               "label": "platform_info",
               "tier": "secondary",
-              "path": "D:\\sync\\Grace\\generated_data\\platform\\",
               "enabled": true,
-              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
+              "actions": [ 
+                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\generated_data\\platform\\" },
+                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Grace\\generated_data\\platform\\" }
+               ]
             }
           ]
         },
         {
           "name": "vera",
           "commands": [
+            {
+              "label": "root",
+              "tier": "primary",
+              "enabled": true,
+              "actions": [
+                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\" },
+                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Vera\\" }
+              ]
+            },
             {
               "label": "code",
               "tier": "primary",
@@ -144,6 +152,24 @@
               "actions": [
                 { "name": "open", "executable": "explorer", "argsTemplate": "{path}" }
               ]
+            },
+            {
+              "label": "spec",
+              "tier": "secondary",
+              "enabled": true,
+              "actions": [
+                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\vendor_data\\spec\\" },
+                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Vera\\vendor_data\\spec\\" }
+              ]
+            },
+            {
+              "label": "platform_info",
+              "tier": "secondary",
+              "enabled": true,
+              "actions": [ 
+                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\generated_data\\platform\\" },
+                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Vera\\generated_data\\platform\\" }
+               ]
             }
           ]
         }

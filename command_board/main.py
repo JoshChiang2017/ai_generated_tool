@@ -112,6 +112,19 @@ class CommandBoardApp(tk.Tk):
             canvas.configure(yscrollcommand=scrollbar.set)
             canvas.pack(side='left', fill='both', expand=True)
             scrollbar.pack(side='right', fill='y')
+            # Enable mouse wheel scrolling (Windows & cross-platform normalization)
+            def _on_mousewheel(event, c=canvas):
+                # Windows event.delta is +/-120 multiples
+                delta = event.delta
+                if delta == 0:
+                    return
+                # Negative goes down
+                c.yview_scroll(int(-1*(delta/120)), 'units')
+            # Windows / general '<MouseWheel>'
+            canvas.bind_all('<MouseWheel>', _on_mousewheel)
+            # Linux (X11) button-4/5
+            canvas.bind_all('<Button-4>', lambda e, c=canvas: c.yview_scroll(-1, 'units'))
+            canvas.bind_all('<Button-5>', lambda e, c=canvas: c.yview_scroll(1, 'units'))
             subgroups = group.get('subgroups')
             if subgroups:
                 for sg in subgroups:

@@ -86,6 +86,30 @@
             }
           ]
         }
+        ,
+        {
+          "name": "kernel",
+          "commands": [
+            {
+              "label": "k5.5",
+              "path": "D:\\work\\Insyde\\kernel\\k5.5\\",
+              "enabled": true,
+              "actions": [
+                { "name": "log", "executable": "TortoiseGitProc", "argsTemplate": "/command:log /path:{path}" },
+                { "name": "bash", "executableAlias": "git_bash", "argsTemplate": "--cd={path}" }
+              ]
+            },
+            {
+              "label": "k5.7",
+              "path": "D:\\work\\Insyde\\kernel\\k5.7\\",
+              "enabled": true,
+              "actions": [
+                { "name": "log", "executable": "TortoiseGitProc", "argsTemplate": "/command:log /path:{path}" },
+                { "name": "bash", "executableAlias": "git_bash", "argsTemplate": "--cd={path}" }
+              ]
+            }
+          ]
+        }
       ]
     }
     ,
@@ -98,7 +122,6 @@
           "commands": [
             {
               "label": "root",
-              "tier": "primary",
               "enabled": true,
               "actions": [
                 { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\" },
@@ -107,14 +130,12 @@
             },
             {
               "label": "code",
-              "tier": "primary",
               "path": "D:\\work\\Grace\\code\\git2\\",
               "enabled": true,
               "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
             },
             {
               "label": "spec",
-              "tier": "secondary",
               "enabled": true,
               "actions": [
                 { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\vendor_data\\spec\\grace\\" },
@@ -123,7 +144,6 @@
             },
             {
               "label": "platform_info",
-              "tier": "secondary",
               "enabled": true,
               "actions": [ 
                 { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\generated_data\\platform\\" },
@@ -137,7 +157,6 @@
           "commands": [
             {
               "label": "root",
-              "tier": "primary",
               "enabled": true,
               "actions": [
                 { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\" },
@@ -146,7 +165,6 @@
             },
             {
               "label": "code",
-              "tier": "primary",
               "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
               "enabled": true,
               "actions": [
@@ -155,7 +173,6 @@
             },
             {
               "label": "spec",
-              "tier": "secondary",
               "enabled": true,
               "actions": [
                 { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\vendor_data\\spec\\" },
@@ -164,7 +181,6 @@
             },
             {
               "label": "platform_info",
-              "tier": "secondary",
               "enabled": true,
               "actions": [ 
                 { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\generated_data\\platform\\" },

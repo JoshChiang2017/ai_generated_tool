@@ -160,35 +160,49 @@ class CommandBoardApp(tk.Tk):
                         btn.pack(side='left', padx=(6 if act is actions[0] else 2,2))
 
     def execute_action(self, base_cmd: Dict[str, Any], action: Dict[str, Any], label_tuple=None):
-        path = base_cmd.get('path')
+        """Execute an action with generic variable substitution.
+
+        Reserved keys: name, executable, executableAlias, argsTemplate, enabled, actions, label.
+        Any other key at command or action level becomes a variable usable in argsTemplate.
+        Action-level keys override command-level keys.
+        """
         act_name = action.get('name', 'action')
         self.logger.log('BUTTON_CLICK', f'{label_tuple} -> {act_name}', status='INFO')
         exe = resolve_executable(action, self.config_data, self.logger)
-        args_template = action.get('argsTemplate', '')
-        needs_path = '{path}' in args_template
-        if not exe or (needs_path and not path):
-            self.logger.log('EXECUTE', f'MISSING executable/path {action}', status='ERROR')
-            messagebox.showerror('Error', f'Missing executable/path for action {act_name}')
+        template = (action.get('argsTemplate') or '').strip()
+        reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','label'}
+        vars_ctx = {k: v for k, v in base_cmd.items() if k not in reserved}
+        for k, v in action.items():
+            if k not in reserved:
+                vars_ctx[k] = v
+        if not exe:
+            self.logger.log('EXECUTE', f'MISSING executable {action}', status='ERROR')
+            messagebox.showerror('Error', f'Missing executable for action {act_name}')
             return
-        final_args = args_template.format(path=path) if args_template else ''
-        # Quote exe if contains spaces
-        quoted_exe = f'"{exe}"' if ' ' in exe and not exe.startswith('"') else exe
-        full_cmd = f"{quoted_exe} {final_args}".strip()
         try:
-            # Use list form if no template shell expansions needed
-            if ' ' in final_args or '%' in final_args:
+            if template:
+                import re
+                placeholders = set(re.findall(r'{([a-zA-Z0-9_]+)}', template))
+                missing = [p for p in placeholders if p not in vars_ctx]
+                if missing:
+                    self.logger.log('EXECUTE', f'Missing vars {missing} for {act_name}', status='ERROR')
+                    messagebox.showerror('Template Error', f'Missing variables: {", ".join(missing)}')
+                    return
+                final_args = template.format(**vars_ctx)
+            else:
+                final_args = ''
+            quoted_exe = f'"{exe}"' if ' ' in exe and not exe.startswith('"') else exe
+            full_cmd = f"{quoted_exe} {final_args}".strip()
+            if final_args:
                 subprocess.Popen(full_cmd, shell=True)
             else:
-                subprocess.Popen([exe] + ([final_args] if final_args else []))
-            self.logger.log('EXECUTE', f'{full_cmd}', status='OK')
+                subprocess.Popen([exe])
+            self.logger.log('EXECUTE', full_cmd, status='OK')
             if self.close_on_action:
                 self.logger.log('APP_CLOSE', 'Auto-close after execute action', status='INFO')
                 self.after(100, self.destroy)
-        except FileNotFoundError:
-            self.logger.log('EXECUTE', f'Executable not found: {exe}', status='ERROR')
-            messagebox.showerror('Execution Failed', f'Executable not found: {exe}')
         except Exception as e:
-            self.logger.log('EXECUTE', f'{full_cmd} ERROR {e}', status='ERROR')
+            self.logger.log('EXECUTE', f'{act_name} ERROR {e}', status='ERROR')
             messagebox.showerror('Execution Failed', str(e))
 
     # Removed reload_config and open_config per user request
@@ -270,57 +284,57 @@ def _collect_executable(action: Dict[str, Any]) -> str:
     return exe or ''
 
 def validate_config(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
-    """Validate paths and executables referenced in config without creating GUI.
-    Optionally logs each check (success or failure) if logger provided.
-    Returns dict with sets of missing items and counts.
-    Rules:
-      - A command path must exist (file or directory) unless empty.
-      - Executable is checked via shutil.which; special cases:
-          * explorer: assumed available on Windows.
-          * *.bat / *.cmd or absolute path: if not in PATH but file exists at given path treat OK.
-    Log events:
-      CONFIG_TEST_PATH_CHECK: <label> | <expanded-path> | OK/MISSING
-      CONFIG_TEST_EXEC_CHECK: <exe> | <location or reason> | OK/MISSING
+    """Validate executables and path-like variables referenced in config.
+
+    Any variable used inside argsTemplate placeholders is checked. If its value
+    appears to be an absolute Windows path and doesn't exist, it's reported.
+    Also retains heuristic for direct absolute path when no placeholders.
     """
+    import re
     missing_paths: Set[str] = set()
     missing_execs: Set[str] = set()
     seen_execs: Set[str] = set()
     total_commands = 0
     total_actions = 0
+    reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','label'}
     for label, pair in iter_commands(config):
         total_actions += 1
         base = pair.get('_base', {})
         action = pair.get('_action', {})
-        path = base.get('path')
-        if path:
-            expanded = os.path.expandvars(path)
-            exists = os.path.exists(expanded)
-            if not exists:
-                missing_paths.add(f'{label} -> {expanded}')
+        template = (action.get('argsTemplate') or '').strip()
+        vars_ctx = {k: v for k, v in base.items() if k not in reserved}
+        for k, v in action.items():
+            if k not in reserved:
+                vars_ctx[k] = v
+        placeholders = set(re.findall(r'{([a-zA-Z0-9_]+)}', template))
+        for ph in placeholders:
+            if ph not in vars_ctx:
+                missing_paths.add(f'{label} -> <missing variable {ph}>')
                 if logger:
-                    logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | MISSING', status='WARN')
-            else:
-                if logger:
-                    logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | OK', status='OK')
-        else:
-            # If no base path, attempt to detect a direct absolute path inside argsTemplate (e.g. explorer C:\foo\bar\)
-            tmpl = action.get('argsTemplate', '') or ''
-            if tmpl and '{path}' not in tmpl:
-                # Heuristic: take first token that looks like an absolute Windows path
-                # Simple pattern: starts with drive letter and \\ or contains \\ after drive.
-                token = tmpl.strip().split()[0]
-                candidate = token
-                if len(candidate) > 2 and candidate[1] == ':' and ('\\' in candidate or '/' in candidate):
-                    expanded = os.path.expandvars(candidate)
-                    if not os.path.exists(expanded):
-                        missing_paths.add(f'{label} -> {expanded} (argsTemplate)')
-                        if logger:
-                            logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} (tmpl) | MISSING', status='WARN')
-                    else:
-                        if logger:
-                            logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} (tmpl) | OK', status='OK')
+                    logger.log('CONFIG_TEST_VAR_MISSING', f'{label} | {ph}', status='WARN')
+                continue
+            val = vars_ctx.get(ph)
+            if isinstance(val, str) and len(val) > 2 and val[1] == ':' and ('\\' in val or '/' in val):
+                expanded = os.path.expandvars(val)
+                if not os.path.exists(expanded):
+                    missing_paths.add(f'{label} -> {expanded}')
+                    if logger:
+                        logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | MISSING', status='WARN')
+                else:
+                    if logger:
+                        logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} | OK', status='OK')
+        if template and not placeholders:
+            first = template.split()[0]
+            if len(first) > 2 and first[1] == ':' and ('\\' in first or '/' in first):
+                expanded = os.path.expandvars(first)
+                if not os.path.exists(expanded):
+                    missing_paths.add(f'{label} -> {expanded} (direct)')
+                    if logger:
+                        logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} (direct) | MISSING', status='WARN')
+                else:
+                    if logger:
+                        logger.log('CONFIG_TEST_PATH_CHECK', f'{label} | {expanded} (direct) | OK', status='OK')
         exe = _collect_executable(action)
-        # Resolve alias to real path if alias provided
         if exe and action.get('executableAlias') and 'aliases' in config:
             real = config.get('aliases', {}).get(action.get('executableAlias'))
             if real:
@@ -338,7 +352,6 @@ def validate_config(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
             else:
                 found = shutil.which(exe)
                 if not found:
-                    # Absolute path or relative file existence check
                     if os.path.isabs(exe) and os.path.exists(exe):
                         if logger:
                             logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | (absolute) | OK', status='OK')
@@ -366,13 +379,13 @@ def validate_config(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
                 for cmd in sg.get('commands', []):
                     if not cmd.get('enabled', True):
                         continue
-                    sig = f"{cmd.get('label')}|{cmd.get('path')}"
+                    sig = f"{cmd.get('label')}"
                     base_signatures.add(sig)
         else:
             for cmd in group.get('commands', []):
                 if not cmd.get('enabled', True):
                     continue
-                sig = f"{cmd.get('label')}|{cmd.get('path')}"
+                sig = f"{cmd.get('label')}"
                 base_signatures.add(sig)
     total_commands = len(base_signatures)
     return {
@@ -387,17 +400,22 @@ def resolve_git_bash_executable(config: Dict[str, Any]) -> str:
     return ''
 
 def build_command_string(cmd_def: Dict[str, Any]) -> str:
-    """Build command allowing optional path when template lacks {path}."""
+    """Build command using generic variables with CommandBuilder."""
     if CommandBuilder:
-        return CommandBuilder(cmd_def).build()
+        return CommandBuilder(dict(cmd_def)).build()
     exe = cmd_def.get('executable') or cmd_def.get('executableAlias')
-    template = cmd_def.get('argsTemplate', '') or ''
-    path = cmd_def.get('path')
+    template = (cmd_def.get('argsTemplate') or '').strip()
     if not exe:
         raise ValueError('Executable missing')
-    if '{path}' in template and not path:
-        raise ValueError('Path placeholder present but path missing')
-    args = template.format(path=path) if template else ''
+    if not template:
+        return exe.strip()
+    import re
+    vars_ctx = {k: v for k, v in cmd_def.items() if k not in {'executable','executableAlias','argsTemplate'}}
+    placeholders = set(re.findall(r'{([a-zA-Z0-9_]+)}', template))
+    missing = [p for p in placeholders if p not in vars_ctx]
+    if missing:
+        raise ValueError(f'Missing variables: {", ".join(missing)}')
+    args = template.format(**vars_ctx)
     return f"{exe} {args}".strip()
 
 def resolve_executable(action: Dict[str, Any], config: Dict[str, Any], logger=None) -> str:
@@ -469,13 +487,19 @@ def main(argv: List[str]):
 
     if args.list:
         print('Available commands:')
+        reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','label'}
         for label, pair in iter_commands(config):
             base = pair.get('_base', {})
             action = pair.get('_action', {})
-            path = base.get('path')
-            resolved_exe = resolve_executable(action, config)
+            exe = resolve_executable(action, config)
+            template = action.get('argsTemplate')
+            vars_ctx = {k: v for k, v in base.items() if k not in reserved}
+            for k, v in action.items():
+                if k not in reserved:
+                    vars_ctx[k] = v
+            build_def: Dict[str, Any] = {'executable': exe, 'argsTemplate': template, **vars_ctx}
             try:
-                cmd_str = build_command_string({'executable': resolved_exe, 'argsTemplate': action.get('argsTemplate'), 'path': path})
+                cmd_str = build_command_string(build_def)
             except Exception as e:
                 cmd_str = f'<invalid: {e}>'
             print(f' - {label}: {cmd_str}')
@@ -489,10 +513,15 @@ def main(argv: List[str]):
         label, pair = matches[0]
         base = pair.get('_base', {})
         action = pair.get('_action', {})
-        path = base.get('path')
         exe = resolve_executable(action, config)
         template = action.get('argsTemplate')
-        cmd_str = build_command_string({'executable': exe, 'argsTemplate': template, 'path': path})
+        reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','label'}
+        vars_ctx = {k: v for k, v in base.items() if k not in reserved}
+        for k, v in action.items():
+            if k not in reserved:
+                vars_ctx[k] = v
+        build_def: Dict[str, Any] = {'executable': exe, 'argsTemplate': template, **vars_ctx}
+        cmd_str = build_command_string(build_def)
         if args.dry_run:
             print(f'DRY RUN: {cmd_str}')
             logger = get_logger(resolve_log_path(config.get('settings', {})))

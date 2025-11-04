@@ -67,6 +67,27 @@ class CommandBoardApp(tk.Tk):
         self.logger = get_logger(log_file)
         self.logger.log('APP_START', 'Application initialized', status='INFO')
         self._build_ui()
+        # Apply window size: accepts WIDTHxHEIGHT (e.g. 1200x800). Fallback to default if invalid.
+        win_size = settings.get('windowSize')
+        applied = False
+        if isinstance(win_size, str):
+            candidate = win_size.strip().lower()
+            import re
+            m = re.match(r'^(\d{2,5})x(\d{2,5})$', candidate)
+            if m:
+                self.geometry(candidate)
+                applied = True
+                self.logger.log('WINDOW_SIZE', f'Applied custom {candidate}', status='OK')
+            else:
+                self.logger.log('WINDOW_SIZE', f'Invalid format {win_size}', status='WARN')
+        if not applied:
+            # Default comfortable size if user did not specify or format invalid
+            self.geometry('1100x750')
+            if not win_size:
+                self.logger.log('WINDOW_SIZE', 'Applied default 1100x750 (no user setting)', status='INFO')
+            else:
+                self.logger.log('WINDOW_SIZE', f'Fallback to default 1100x750 from {win_size}', status='INFO')
+
 
     def _build_ui(self):
         # Top control bar (Test button moved right & de-emphasized)
@@ -97,13 +118,58 @@ class CommandBoardApp(tk.Tk):
         notebook = ttk.Notebook(self, style='CB.TNotebook')
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
 
+        # Active canvas tracking for unified scrolling
+        self._active_scroll_canvas: tk.Canvas | None = None
+
+        def _wheel(event):
+            c = self._active_scroll_canvas
+            if not c:
+                return
+            delta = event.delta
+            if delta == 0:
+                return
+            c.yview_scroll(int(-1*(delta/120)), 'units')
+        def _button4(_event):
+            c = self._active_scroll_canvas
+            if c:
+                c.yview_scroll(-1, 'units')
+        def _button5(_event):
+            c = self._active_scroll_canvas
+            if c:
+                c.yview_scroll(1, 'units')
+        def _page_up(_event):
+            c = self._active_scroll_canvas
+            if c:
+                c.yview_scroll(-1, 'pages')
+        def _page_down(_event):
+            c = self._active_scroll_canvas
+            if c:
+                c.yview_scroll(1, 'pages')
+
+        # Bind once globally; routing depends on hover-selected canvas
+        self.bind_all('<MouseWheel>', _wheel)
+        self.bind_all('<Button-4>', _button4)
+        self.bind_all('<Button-5>', _button5)
+        self.bind_all('<Prior>', _page_up)   # PageUp
+        self.bind_all('<Next>', _page_down)  # PageDown
+        # Ensure the window itself has focus so PageUp/PageDown work immediately
+        # (Some window managers require a slight delay before force focus)
+        self.after(80, self.focus_force)
+
+        # Hover-based active canvas selection
+        def _attach_scroll(canvas: tk.Canvas):
+            def _enter(_event):
+                # Keep last hovered canvas even after leaving so PageUp/PageDown work anywhere
+                self._active_scroll_canvas = canvas
+            # We intentionally do NOT clear active canvas on leave to allow global key usage
+            canvas.bind('<Enter>', _enter)
+
         for group in self.config_data.get('groups', []):
             frame = ttk.Frame(notebook)
             notebook.add(frame, text=group.get('name', 'Group'))
             desc = group.get('description')
             if desc:
                 ttk.Label(frame, text=desc, foreground='#555').pack(anchor='w', padx=6, pady=(6,2))
-            # Scrollable canvas if many buttons
             canvas = tk.Canvas(frame)
             scrollbar = ttk.Scrollbar(frame, orient='vertical', command=canvas.yview)
             inner = ttk.Frame(canvas)
@@ -112,19 +178,10 @@ class CommandBoardApp(tk.Tk):
             canvas.configure(yscrollcommand=scrollbar.set)
             canvas.pack(side='left', fill='both', expand=True)
             scrollbar.pack(side='right', fill='y')
-            # Enable mouse wheel scrolling (Windows & cross-platform normalization)
-            def _on_mousewheel(event, c=canvas):
-                # Windows event.delta is +/-120 multiples
-                delta = event.delta
-                if delta == 0:
-                    return
-                # Negative goes down
-                c.yview_scroll(int(-1*(delta/120)), 'units')
-            # Windows / general '<MouseWheel>'
-            canvas.bind_all('<MouseWheel>', _on_mousewheel)
-            # Linux (X11) button-4/5
-            canvas.bind_all('<Button-4>', lambda e, c=canvas: c.yview_scroll(-1, 'units'))
-            canvas.bind_all('<Button-5>', lambda e, c=canvas: c.yview_scroll(1, 'units'))
+            _attach_scroll(canvas)
+            if self._active_scroll_canvas is None:
+                # Set first created canvas as default active (immediate wheel usability)
+                self._active_scroll_canvas = canvas
             subgroups = group.get('subgroups')
             if subgroups:
                 for sg in subgroups:

@@ -197,7 +197,8 @@
     "buttonWidth": 30,
     "logOnClick": true,
     "logFile": "action.log",
-    "closeOnAction": false
+    "closeOnAction": false,
+    "windowSize": "400x500"
   },
   "aliases": {
     "git_bash": "C:\\Program Files\\Git\\git-bash.exe"

@@ -8,12 +8,37 @@
           "name": "Grace",
           "commands": [
             {
+              "label": "code",
+              "path": "D:\\work\\Grace\\code\\git2",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "folder",
+                  "executable": "explorer",
+                  "argsTemplate": "{path}"
+                },
+                {
+                  "name": "BUILD",
+                  "executable": "cmd",
+                  "argsTemplate": "/C start /D {path}\\Board\\ServerMultiBoardPkg ProjectBuild.bat"
+                }
+              ]
+            },
+            {
               "label": "Board",
               "path": "D:\\work\\Grace\\code\\git2\\",
               "enabled": true,
               "actions": [
-                {"name": "log", "executable": "TortoiseGitProc", "argsTemplate": "/command:log /path:{path}"},
-                {"name": "bash", "executableAlias": "git_bash", "argsTemplate": "--cd={path}"}
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
+                },
+                {
+                  "name": "bash",
+                  "executableAlias": "git_bash",
+                  "argsTemplate": "--cd={path}"
+                }
               ]
             }
           ]
@@ -21,6 +46,23 @@
         {
           "name": "vera",
           "commands": [
+            {
+              "label": "code",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "folder",
+                  "executable": "explorer",
+                  "argsTemplate": "{path}"
+                },
+                {
+                  "name": "BUILD",
+                  "executable": "cmd",
+                  "argsTemplate": "/C start /D {path}\\Board\\Nvidia\\VeraMultiBoardPkg ProjectBuild.bat"
+                }
+              ]
+            },
             {
               "label": "Kernel",
               "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
@@ -85,8 +127,7 @@
               ]
             }
           ]
-        }
-        ,
+        },
         {
           "name": "kernel",
           "commands": [
@@ -95,8 +136,16 @@
               "path": "D:\\work\\Insyde\\kernel\\k5.5\\",
               "enabled": true,
               "actions": [
-                { "name": "log", "executable": "TortoiseGitProc", "argsTemplate": "/command:log /path:{path}" },
-                { "name": "bash", "executableAlias": "git_bash", "argsTemplate": "--cd={path}" }
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
+                },
+                {
+                  "name": "bash",
+                  "executableAlias": "git_bash",
+                  "argsTemplate": "--cd={path}"
+                }
               ]
             },
             {
@@ -104,15 +153,22 @@
               "path": "D:\\work\\Insyde\\kernel\\k5.7\\",
               "enabled": true,
               "actions": [
-                { "name": "log", "executable": "TortoiseGitProc", "argsTemplate": "/command:log /path:{path}" },
-                { "name": "bash", "executableAlias": "git_bash", "argsTemplate": "--cd={path}" }
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
+                },
+                {
+                  "name": "bash",
+                  "executableAlias": "git_bash",
+                  "argsTemplate": "--cd={path}"
+                }
               ]
             }
           ]
         }
       ]
-    }
-    ,
+    },
     {
       "name": "folder",
       "description": "Open frequently used folders",
@@ -124,31 +180,49 @@
               "label": "root",
               "enabled": true,
               "actions": [
-                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\" },
-                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Grace\\" }
+                {
+                  "name": "sync",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\sync\\Grace\\"
+                },
+                {
+                  "name": "work",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Grace\\"
+                }
               ]
-            },
-            {
-              "label": "code",
-              "path": "D:\\work\\Grace\\code\\git2\\",
-              "enabled": true,
-              "actions": [ { "name": "open", "executable": "explorer", "argsTemplate": "{path}" } ]
             },
             {
               "label": "spec",
               "enabled": true,
               "actions": [
-                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\vendor_data\\spec\\grace\\" },
-                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Grace\\vendor_data\\spec\\grace\\" }
+                {
+                  "name": "sync",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\sync\\Grace\\vendor_data\\spec\\grace\\"
+                },
+                {
+                  "name": "work",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Grace\\vendor_data\\spec\\grace\\"
+                }
               ]
             },
             {
               "label": "platform_info",
               "enabled": true,
-              "actions": [ 
-                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Grace\\generated_data\\platform\\" },
-                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Grace\\generated_data\\platform\\" }
-               ]
+              "actions": [
+                {
+                  "name": "sync",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\sync\\Grace\\generated_data\\platform\\"
+                },
+                {
+                  "name": "work",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Grace\\generated_data\\platform\\"
+                }
+              ]
             }
           ]
         },
@@ -159,33 +233,66 @@
               "label": "root",
               "enabled": true,
               "actions": [
-                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\" },
-                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Vera\\" }
-              ]
-            },
-            {
-              "label": "code",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
-              "enabled": true,
-              "actions": [
-                { "name": "open", "executable": "explorer", "argsTemplate": "{path}" }
+                {
+                  "name": "sync",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\sync\\Vera\\"
+                },
+                {
+                  "name": "work",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Vera\\"
+                }
               ]
             },
             {
               "label": "spec",
               "enabled": true,
               "actions": [
-                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\vendor_data\\spec\\" },
-                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Vera\\vendor_data\\spec\\" }
+                {
+                  "name": "sync",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\sync\\Vera\\vendor_data\\spec\\"
+                },
+                {
+                  "name": "work",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Vera\\vendor_data\\spec\\"
+                }
               ]
             },
             {
               "label": "platform_info",
               "enabled": true,
-              "actions": [ 
-                { "name": "sync", "executable": "explorer", "argsTemplate": "D:\\sync\\Vera\\generated_data\\platform\\" },
-                { "name": "work", "executable": "explorer", "argsTemplate": "D:\\work\\Vera\\generated_data\\platform\\" }
-               ]
+              "actions": [
+                {
+                  "name": "sync",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\sync\\Vera\\generated_data\\platform\\"
+                },
+                {
+                  "name": "work",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Vera\\generated_data\\platform\\"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "kernel",
+          "commands": [
+            {
+              "label": "code",
+              "path": "D:\\work\\Insyde\\kernel",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "folder",
+                  "executable": "explorer",
+                  "argsTemplate": "{path}"
+                }
+              ]
             }
           ]
         }
@@ -195,7 +302,7 @@
   "settings": {
     "windowTitle": "Command Board",
     "buttonWidth": 30,
-    "logOnClick": true,
+    "recordLog": false,
     "logFile": "action.log",
     "closeOnAction": false,
     "windowSize": "400x500"

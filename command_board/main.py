@@ -43,29 +43,41 @@ try:
 except ImportError:
     CommandBuilder = None  # type: ignore
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'command_config.json')
+def get_application_path():
+    """Get the directory where the application/script is located."""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable - use exe directory
+        return os.path.dirname(sys.executable)
+    else:
+        # Running as script - use script directory
+        return os.path.dirname(os.path.abspath(__file__))
+
+CONFIG_FILE = os.path.join(get_application_path(), 'command_config.json')
 
 def resolve_log_path(settings: Dict[str, Any]) -> str:
-    """Anchor log file to script directory if relative."""
-    script_dir = os.path.dirname(__file__)
+    """Anchor log file to application directory if relative."""
+    app_dir = get_application_path()
     raw = settings.get('logFile') if isinstance(settings, dict) else None
     if not raw:
-        return os.path.join(script_dir, 'command_board_actions.log')
+        return os.path.join(app_dir, 'command_board_actions.log')
     if os.path.isabs(raw):
         return raw
-    return os.path.join(script_dir, raw)
+    return os.path.join(app_dir, raw)
 
 class CommandBoardApp(tk.Tk):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], config_path: str = CONFIG_FILE):
         super().__init__()
         settings = config.get('settings', {})
         self.title(settings.get('windowTitle', 'Command Board'))
         self.config_data = config
+        self.config_path = config_path
         self.button_width = settings.get('buttonWidth', 30)
         self.close_on_action = settings.get('closeOnAction', True)
+        self.record_log = settings.get('recordLog', False)
         log_file = resolve_log_path(settings)
         self.logger = get_logger(log_file)
-        self.logger.log('APP_START', 'Application initialized', status='INFO')
+        if self.record_log:
+            self.logger.log('APP_START', 'Application initialized', status='INFO')
         self._build_ui()
         # Apply window size: accepts WIDTHxHEIGHT (e.g. 1200x800). Fallback to default if invalid.
         win_size = settings.get('windowSize')
@@ -77,32 +89,22 @@ class CommandBoardApp(tk.Tk):
             if m:
                 self.geometry(candidate)
                 applied = True
-                self.logger.log('WINDOW_SIZE', f'Applied custom {candidate}', status='OK')
+                if self.record_log:
+                    self.logger.log('WINDOW_SIZE', f'Applied custom {candidate}', status='OK')
             else:
-                self.logger.log('WINDOW_SIZE', f'Invalid format {win_size}', status='WARN')
+                if self.record_log:
+                    self.logger.log('WINDOW_SIZE', f'Invalid format {win_size}', status='WARN')
         if not applied:
             # Default comfortable size if user did not specify or format invalid
             self.geometry('1100x750')
-            if not win_size:
-                self.logger.log('WINDOW_SIZE', 'Applied default 1100x750 (no user setting)', status='INFO')
-            else:
-                self.logger.log('WINDOW_SIZE', f'Fallback to default 1100x750 from {win_size}', status='INFO')
+            if self.record_log:
+                if not win_size:
+                    self.logger.log('WINDOW_SIZE', 'Applied default 1100x750 (no user setting)', status='INFO')
+                else:
+                    self.logger.log('WINDOW_SIZE', f'Fallback to default 1100x750 from {win_size}', status='INFO')
 
 
     def _build_ui(self):
-        # Top control bar (Test button moved right & de-emphasized)
-        control_bar = ttk.Frame(self)
-        control_bar.pack(fill='x', padx=8, pady=(6, 0))
-        # Left spacer (remove window title from body)
-        ttk.Frame(control_bar).pack(side='left', padx=4)
-        # Right side container
-        right_box = ttk.Frame(control_bar)
-        right_box.pack(side='right')
-        test_btn = ttk.Button(right_box, text='⚙', width=3, command=self.run_tests)
-        test_btn.pack(side='right', padx=(4,0))
-        # Tooltip for test button
-        create_tooltip(test_btn, 'TEST')
-
         # === Notebook Style Enhancement for clearer tab separation ===
         style = ttk.Style(self)
         current_theme = style.theme_use()
@@ -216,6 +218,33 @@ class CommandBoardApp(tk.Tk):
                                          command=lambda a=act, base=cmd, lab=(group.get('name','Group'), None, label, act_name): self.execute_action(base, a, lab))
                         btn.pack(side='left', padx=(6 if act is actions[0] else 2,2))
 
+        # Settings Tab (placed at the end)
+        settings_frame = ttk.Frame(notebook)
+        notebook.add(settings_frame, text='Settings')
+        
+        # Settings content
+        settings_inner = ttk.Frame(settings_frame)
+        settings_inner.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Title
+        ttk.Label(settings_inner, text='Settings', font=('Segoe UI', 12, 'bold')).pack(anchor='w', pady=(0, 15))
+        
+        # Advanced setting (Config Test)
+        test_frame = ttk.LabelFrame(settings_inner, text='Advanced', padding=10)
+        test_frame.pack(fill='x', pady=(0, 15))
+        test_btn = ttk.Button(test_frame, text='Run Config Test', command=self.run_tests)
+        test_btn.pack(anchor='w')
+        ttk.Label(test_frame, text='Validate paths and executables in configuration', 
+                  foreground='#666').pack(anchor='w', padx=20, pady=(5, 0))
+        
+        # Configuration setting (Record Log)
+        log_frame = ttk.LabelFrame(settings_inner, text='Configuration', padding=10)
+        log_frame.pack(fill='x', pady=(0, 15))
+        self.record_log_var = tk.BooleanVar(value=self.record_log)
+        log_cb = ttk.Checkbutton(log_frame, text='Enable logging', 
+                                 variable=self.record_log_var, command=self._toggle_record_log)
+        log_cb.pack(anchor='w')
+
     def execute_action(self, base_cmd: Dict[str, Any], action: Dict[str, Any], label_tuple=None):
         """Execute an action with generic variable substitution.
 
@@ -224,8 +253,9 @@ class CommandBoardApp(tk.Tk):
         Action-level keys override command-level keys.
         """
         act_name = action.get('name', 'action')
-        self.logger.log('BUTTON_CLICK', f'{label_tuple} -> {act_name}', status='INFO')
-        exe = resolve_executable(action, self.config_data, self.logger)
+        if self.record_log:
+            self.logger.log('BUTTON_CLICK', f'{label_tuple} -> {act_name}', status='INFO')
+        exe = resolve_executable(action, self.config_data, self.logger if self.record_log else None)
         template = (action.get('argsTemplate') or '').strip()
         reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','label'}
         vars_ctx = {k: v for k, v in base_cmd.items() if k not in reserved}
@@ -233,7 +263,8 @@ class CommandBoardApp(tk.Tk):
             if k not in reserved:
                 vars_ctx[k] = v
         if not exe:
-            self.logger.log('EXECUTE', f'MISSING executable {action}', status='ERROR')
+            if self.record_log:
+                self.logger.log('EXECUTE', f'MISSING executable {action}', status='ERROR')
             messagebox.showerror('Error', f'Missing executable for action {act_name}')
             return
         try:
@@ -242,7 +273,8 @@ class CommandBoardApp(tk.Tk):
                 placeholders = set(re.findall(r'{([a-zA-Z0-9_]+)}', template))
                 missing = [p for p in placeholders if p not in vars_ctx]
                 if missing:
-                    self.logger.log('EXECUTE', f'Missing vars {missing} for {act_name}', status='ERROR')
+                    if self.record_log:
+                        self.logger.log('EXECUTE', f'Missing vars {missing} for {act_name}', status='ERROR')
                     messagebox.showerror('Template Error', f'Missing variables: {", ".join(missing)}')
                     return
                 final_args = template.format(**vars_ctx)
@@ -254,30 +286,55 @@ class CommandBoardApp(tk.Tk):
                 subprocess.Popen(full_cmd, shell=True)
             else:
                 subprocess.Popen([exe])
-            self.logger.log('EXECUTE', full_cmd, status='OK')
+            if self.record_log:
+                self.logger.log('EXECUTE', full_cmd, status='OK')
             if self.close_on_action:
-                self.logger.log('APP_CLOSE', 'Auto-close after execute action', status='INFO')
+                if self.record_log:
+                    self.logger.log('APP_CLOSE', 'Auto-close after execute action', status='INFO')
                 self.after(100, self.destroy)
         except Exception as e:
-            self.logger.log('EXECUTE', f'{act_name} ERROR {e}', status='ERROR')
+            if self.record_log:
+                self.logger.log('EXECUTE', f'{act_name} ERROR {e}', status='ERROR')
             messagebox.showerror('Execution Failed', str(e))
 
     # Removed reload_config and open_config per user request
 
+    def _toggle_record_log(self):
+        """Toggle recordLog setting and save to config file."""
+        self.record_log = self.record_log_var.get()
+        if self.record_log:
+            self.logger.log('SETTING_CHANGE', f'recordLog={self.record_log}', status='INFO')
+        # Update config data
+        if 'settings' not in self.config_data:
+            self.config_data['settings'] = {}
+        self.config_data['settings']['recordLog'] = self.record_log
+        # Save to file
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config_data, f, indent=2, ensure_ascii=False)
+            if self.record_log:
+                self.logger.log('CONFIG_SAVE', f'Saved recordLog={self.record_log} to {self.config_path}', status='OK')
+        except Exception as e:
+            if self.record_log:
+                self.logger.log('CONFIG_SAVE', f'Failed to save config: {e}', status='ERROR')
+            messagebox.showerror('Save Error', f'Failed to save config: {e}')
+
     # ===================== Validation / Test Button =====================
     def run_tests(self):
-        report = validate_config(self.config_data, logger=self.logger)
-        self.logger.log('CONFIG_TEST', 'started', status='INFO')
+        report = validate_config(self.config_data, logger=self.logger if self.record_log else None)
+        if self.record_log:
+            self.logger.log('CONFIG_TEST', 'started', status='INFO')
         missing_paths = report['missing_paths']
         missing_execs = report['missing_executables']
         total_cmds = report['total_commands']
         total_actions = report['total_actions']
         # Log each missing item individually for easier grep
         # Already logged each check; still log aggregate missing items for quick grep
-        for p in sorted(missing_paths):
-            self.logger.log('CONFIG_TEST_PATH_MISSING', p, status='WARN')
-        for e in sorted(missing_execs):
-            self.logger.log('CONFIG_TEST_EXEC_MISSING', e, status='WARN')
+        if self.record_log:
+            for p in sorted(missing_paths):
+                self.logger.log('CONFIG_TEST_PATH_MISSING', p, status='WARN')
+            for e in sorted(missing_execs):
+                self.logger.log('CONFIG_TEST_EXEC_MISSING', e, status='WARN')
         lines: List[str] = []
         lines.append(f'Total commands: {total_cmds}')
         lines.append(f'Total actions: {total_actions}')
@@ -289,7 +346,8 @@ class CommandBoardApp(tk.Tk):
             lines.append(f'  EXEC ! {e}')
         summary = '\n'.join(lines)
         status = 'OK' if not missing_paths and not missing_execs else 'WARN'
-        self.logger.log('CONFIG_TEST_RESULT', summary.replace('\n', ' | '), status=status)
+        if self.record_log:
+            self.logger.log('CONFIG_TEST_RESULT', summary.replace('\n', ' | '), status=status)
         if not missing_paths and not missing_execs:
             messagebox.showinfo('Config Test', 'All OK!\n\n' + summary)
         else:
@@ -512,17 +570,21 @@ def main(argv: List[str]):
 
     if getattr(args, 'test_config', False):
         # Perform validation only (CLI mode) with logging
-        logger = get_logger(resolve_log_path(config.get('settings', {})))
-        logger.log('CONFIG_TEST', 'cli started', status='INFO')
-        report = validate_config(config, logger=logger)
+        settings = config.get('settings', {})
+        record_log = settings.get('recordLog', False)
+        logger = get_logger(resolve_log_path(settings))
+        if record_log:
+            logger.log('CONFIG_TEST', 'cli started', status='INFO')
+        report = validate_config(config, logger=logger if record_log else None)
         missing_paths = report['missing_paths']
         missing_execs = report['missing_executables']
         total_cmds = report['total_commands']
         total_actions = report['total_actions']
-        for p in sorted(missing_paths):
-            logger.log('CONFIG_TEST_PATH_MISSING', p, status='WARN')
-        for e in sorted(missing_execs):
-            logger.log('CONFIG_TEST_EXEC_MISSING', e, status='WARN')
+        if record_log:
+            for p in sorted(missing_paths):
+                logger.log('CONFIG_TEST_PATH_MISSING', p, status='WARN')
+            for e in sorted(missing_execs):
+                logger.log('CONFIG_TEST_EXEC_MISSING', e, status='WARN')
         print('CONFIG VALIDATION SUMMARY')
         print(f'  Total commands : {total_cmds}')
         print(f'  Total actions  : {total_actions}')
@@ -534,11 +596,13 @@ def main(argv: List[str]):
             print(f'    EXEC ! {e}')
         if not missing_paths and not missing_execs:
             print('Result: OK')
-            logger.log('CONFIG_TEST_RESULT', 'OK', status='OK')
+            if record_log:
+                logger.log('CONFIG_TEST_RESULT', 'OK', status='OK')
             sys.exit(0)
         else:
             print('Result: WARN (issues found)')
-            logger.log('CONFIG_TEST_RESULT', f'WARN paths={len(missing_paths)} execs={len(missing_execs)}', status='WARN')
+            if record_log:
+                logger.log('CONFIG_TEST_RESULT', f'WARN paths={len(missing_paths)} execs={len(missing_execs)}', status='WARN')
             sys.exit(4)
             sys.exit(4)
 
@@ -581,30 +645,41 @@ def main(argv: List[str]):
         cmd_str = build_command_string(build_def)
         if args.dry_run:
             print(f'DRY RUN: {cmd_str}')
-            logger = get_logger(resolve_log_path(config.get('settings', {})))
-            logger.log('CLI_DRY_RUN', f'{label} -> {cmd_str}', status='INFO')
+            settings = config.get('settings', {})
+            if settings.get('recordLog', False):
+                logger = get_logger(resolve_log_path(settings))
+                logger.log('CLI_DRY_RUN', f'{label} -> {cmd_str}', status='INFO')
             return
         try:
             subprocess.Popen(cmd_str, shell=True)
             print(f'Executed: {cmd_str}')
-            logger = get_logger(resolve_log_path(config.get('settings', {})))
-            logger.log('CLI_EXECUTE', f'{label} -> {cmd_str}', status='OK')
+            settings = config.get('settings', {})
+            if settings.get('recordLog', False):
+                logger = get_logger(resolve_log_path(settings))
+                logger.log('CLI_EXECUTE', f'{label} -> {cmd_str}', status='OK')
         except Exception as e:
             print(f'Execution failed: {e}', file=sys.stderr)
-            logger = get_logger(resolve_log_path(config.get('settings', {})))
-            logger.log('CLI_EXECUTE', f'{label} ERROR {e}', status='ERROR')
+            settings = config.get('settings', {})
+            if settings.get('recordLog', False):
+                logger = get_logger(resolve_log_path(settings))
+                logger.log('CLI_EXECUTE', f'{label} ERROR {e}', status='ERROR')
             sys.exit(3)
         return
 
     # If one-shot provided, force closeOnAction true
     if getattr(args, 'one_shot', False):
         config.setdefault('settings', {})['closeOnAction'] = True
-    app = CommandBoardApp(config)
+    app = CommandBoardApp(config, config_path)
     if getattr(args, 'auto_exit', None):
         seconds = max(0, args.auto_exit)
         ms = seconds * 1000
-        app.logger.log('APP_AUTO_EXIT_SCHEDULED', f'exiting in {seconds}s', status='INFO')
-        app.after(ms, lambda: (app.logger.log('APP_AUTO_EXIT', 'auto exit trigger', status='INFO'), app.destroy()))
+        if app.record_log:
+            app.logger.log('APP_AUTO_EXIT_SCHEDULED', f'exiting in {seconds}s', status='INFO')
+        def auto_exit_handler():
+            if app.record_log:
+                app.logger.log('APP_AUTO_EXIT', 'auto exit trigger', status='INFO')
+            app.destroy()
+        app.after(ms, auto_exit_handler)
     app.mainloop()
 
 if __name__ == '__main__':

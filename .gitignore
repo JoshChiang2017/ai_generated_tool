@@ -12,6 +12,8 @@ env/
 .venv/
 
 # Output files
+dist/
+build/
 outputs/
 *.png
 *.jpg

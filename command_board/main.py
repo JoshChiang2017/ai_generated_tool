@@ -237,13 +237,18 @@ class CommandBoardApp(tk.Tk):
         ttk.Label(test_frame, text='Validate paths and executables in configuration', 
                   foreground='#666').pack(anchor='w', padx=20, pady=(5, 0))
         
-        # Configuration setting (Record Log)
+        # Configuration setting (Record Log & Close on Action)
         log_frame = ttk.LabelFrame(settings_inner, text='Configuration', padding=10)
         log_frame.pack(fill='x', pady=(0, 15))
         self.record_log_var = tk.BooleanVar(value=self.record_log)
         log_cb = ttk.Checkbutton(log_frame, text='Enable logging', 
                                  variable=self.record_log_var, command=self._toggle_record_log)
         log_cb.pack(anchor='w')
+        
+        self.close_on_action_var = tk.BooleanVar(value=self.close_on_action)
+        close_cb = ttk.Checkbutton(log_frame, text='Close window after action (One-shot mode)', 
+                                    variable=self.close_on_action_var, command=self._toggle_close_on_action)
+        close_cb.pack(anchor='w', pady=(5, 0))
 
     def execute_action(self, base_cmd: Dict[str, Any], action: Dict[str, Any], label_tuple=None):
         """Execute an action with generic variable substitution.
@@ -314,6 +319,26 @@ class CommandBoardApp(tk.Tk):
                 json.dump(self.config_data, f, indent=2, ensure_ascii=False)
             if self.record_log:
                 self.logger.log('CONFIG_SAVE', f'Saved recordLog={self.record_log} to {self.config_path}', status='OK')
+        except Exception as e:
+            if self.record_log:
+                self.logger.log('CONFIG_SAVE', f'Failed to save config: {e}', status='ERROR')
+            messagebox.showerror('Save Error', f'Failed to save config: {e}')
+
+    def _toggle_close_on_action(self):
+        """Toggle closeOnAction setting and save to config file."""
+        self.close_on_action = self.close_on_action_var.get()
+        if self.record_log:
+            self.logger.log('SETTING_CHANGE', f'closeOnAction={self.close_on_action}', status='INFO')
+        # Update config data
+        if 'settings' not in self.config_data:
+            self.config_data['settings'] = {}
+        self.config_data['settings']['closeOnAction'] = self.close_on_action
+        # Save to file
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config_data, f, indent=2, ensure_ascii=False)
+            if self.record_log:
+                self.logger.log('CONFIG_SAVE', f'Saved closeOnAction={self.close_on_action} to {self.config_path}', status='OK')
         except Exception as e:
             if self.record_log:
                 self.logger.log('CONFIG_SAVE', f'Failed to save config: {e}', status='ERROR')

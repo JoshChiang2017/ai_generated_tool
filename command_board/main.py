@@ -3,40 +3,18 @@ import os
 import subprocess
 import sys
 import shutil
-import tkinter as tk
-from tkinter import ttk, messagebox
-# Removed unused import (test)
+import customtkinter as ctk
+from tkinter import messagebox
 from typing import Dict, Any, List, Tuple, Set
 import argparse
 from action_logger import get_logger
 
-# Tooltip helper (re-added)
-class _Tooltip:
-    def __init__(self, widget, text: str):
-        self.widget = widget
-        self.text = text
-        self.tip = None
-        widget.bind('<Enter>', self._show)
-        widget.bind('<Leave>', self._hide)
+# Set appearance mode and color theme
+ctk.set_appearance_mode("System")  # Modes: "System", "Dark", "Light"
+ctk.set_default_color_theme("dark-blue")  # Themes: "blue", "green", "dark-blue"
 
-    def _show(self, _event=None):
-        if self.tip or not self.text:
-            return
-        x = self.widget.winfo_rootx() + self.widget.winfo_width() + 6
-        y = self.widget.winfo_rooty() + 4
-        self.tip = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f'+{x}+{y}')
-        lbl = tk.Label(tw, text=self.text, background='#ffffe0', borderwidth=1, relief='solid', font=('Segoe UI', 9))
-        lbl.pack(ipadx=4, ipady=2)
-
-    def _hide(self, _event=None):
-        if self.tip:
-            self.tip.destroy()
-            self.tip = None
-
-def create_tooltip(widget, text: str):
-    _Tooltip(widget, text)
+# CustomTkinter has built-in tooltip support via CTkToolTip (optional)
+# For now, we'll skip tooltips or use simple approach
 
 try:
     from core import CommandBuilder
@@ -64,7 +42,7 @@ def resolve_log_path(settings: Dict[str, Any]) -> str:
         return raw
     return os.path.join(app_dir, raw)
 
-class CommandBoardApp(tk.Tk):
+class CommandBoardApp(ctk.CTk):
     def __init__(self, config: Dict[str, Any], config_path: str = CONFIG_FILE):
         super().__init__()
         settings = config.get('settings', {})
@@ -105,150 +83,116 @@ class CommandBoardApp(tk.Tk):
 
 
     def _build_ui(self):
-        # === Notebook Style Enhancement for clearer tab separation ===
-        style = ttk.Style(self)
-        current_theme = style.theme_use()
-        # Configure custom notebook & tab style
-        style.configure('CB.TNotebook', tabmargins=(8, 4, 8, 0))  # left/top/right/bottom extra spacing
-        style.configure('CB.TNotebook.Tab', padding=(14, 6), borderwidth=1)
-        # Use map to differentiate selected vs unselected
-        style.map('CB.TNotebook.Tab',
-                  background=[('selected', '#ffffff'), ('!selected', '#e6e6e6')],
-                  foreground=[('selected', '#000000'), ('!selected', '#444444')])
-
-        # Notebook for groups with custom style
-        notebook = ttk.Notebook(self, style='CB.TNotebook')
-        notebook.pack(fill='both', expand=True, padx=8, pady=8)
-
-        # Active canvas tracking for unified scrolling
-        self._active_scroll_canvas: tk.Canvas | None = None
-
-        def _wheel(event):
-            c = self._active_scroll_canvas
-            if not c:
-                return
-            delta = event.delta
-            if delta == 0:
-                return
-            c.yview_scroll(int(-1*(delta/120)), 'units')
-        def _button4(_event):
-            c = self._active_scroll_canvas
-            if c:
-                c.yview_scroll(-1, 'units')
-        def _button5(_event):
-            c = self._active_scroll_canvas
-            if c:
-                c.yview_scroll(1, 'units')
-        def _page_up(_event):
-            c = self._active_scroll_canvas
-            if c:
-                c.yview_scroll(-1, 'pages')
-        def _page_down(_event):
-            c = self._active_scroll_canvas
-            if c:
-                c.yview_scroll(1, 'pages')
-
-        # Bind once globally; routing depends on hover-selected canvas
-        self.bind_all('<MouseWheel>', _wheel)
-        self.bind_all('<Button-4>', _button4)
-        self.bind_all('<Button-5>', _button5)
-        self.bind_all('<Prior>', _page_up)   # PageUp
-        self.bind_all('<Next>', _page_down)  # PageDown
-        # Ensure the window itself has focus so PageUp/PageDown work immediately
-        # (Some window managers require a slight delay before force focus)
-        self.after(80, self.focus_force)
-
-        # Hover-based active canvas selection
-        def _attach_scroll(canvas: tk.Canvas):
-            def _enter(_event):
-                # Keep last hovered canvas even after leaving so PageUp/PageDown work anywhere
-                self._active_scroll_canvas = canvas
-            # We intentionally do NOT clear active canvas on leave to allow global key usage
-            canvas.bind('<Enter>', _enter)
+        # Create tabview for groups (CustomTkinter uses CTkTabview instead of Notebook)
+        tabview = ctk.CTkTabview(self)
+        tabview.pack(fill='both', expand=True, padx=10, pady=10)
+        # Configure tab button font size
+        tabview._segmented_button.configure(font=ctk.CTkFont(size=16))
 
         for group in self.config_data.get('groups', []):
-            frame = ttk.Frame(notebook)
-            notebook.add(frame, text=group.get('name', 'Group'))
+            group_name = group.get('name', 'Group')
+            tab = tabview.add(group_name)
+            
+            # Use CTkScrollableFrame for scrollable content
+            scroll_frame = ctk.CTkScrollableFrame(tab)
+            scroll_frame.pack(fill='both', expand=True, padx=5, pady=5)
+            
             desc = group.get('description')
             if desc:
-                ttk.Label(frame, text=desc, foreground='#555').pack(anchor='w', padx=6, pady=(6,2))
-            canvas = tk.Canvas(frame)
-            scrollbar = ttk.Scrollbar(frame, orient='vertical', command=canvas.yview)
-            inner = ttk.Frame(canvas)
-            inner.bind('<Configure>', lambda e, c=canvas: c.configure(scrollregion=c.bbox('all')))
-            canvas.create_window((0,0), window=inner, anchor='nw')
-            canvas.configure(yscrollcommand=scrollbar.set)
-            canvas.pack(side='left', fill='both', expand=True)
-            scrollbar.pack(side='right', fill='y')
-            _attach_scroll(canvas)
-            if self._active_scroll_canvas is None:
-                # Set first created canvas as default active (immediate wheel usability)
-                self._active_scroll_canvas = canvas
+                desc_label = ctk.CTkLabel(scroll_frame, text=desc, text_color="gray50")
+                desc_label.pack(anchor='w', padx=10, pady=(5,10))
+            
             subgroups = group.get('subgroups')
             if subgroups:
                 for sg in subgroups:
                     sg_name = sg.get('name', 'subgroup')
-                    header = ttk.Label(inner, text=sg_name, font=('Segoe UI', 10, 'bold'))
-                    header.pack(anchor='w', padx=6, pady=(12,4))
+                    # Subgroup header
+                    header = ctk.CTkLabel(scroll_frame, text=sg_name, font=ctk.CTkFont(size=16, weight="bold"))
+                    header.pack(anchor='w', padx=10, pady=(15,5))
+                    
                     for cmd in sg.get('commands', []):
                         if not cmd.get('enabled', True):
                             continue
                         label = cmd.get('label', 'Unnamed')
                         actions = cmd.get('actions', [])
-                        row = ttk.Frame(inner)
-                        row.pack(anchor='w', fill='x', padx=12, pady=3)
-                        ttk.Label(row, text=label, width=self.button_width, anchor='w').pack(side='left')
+                        
+                        # Command row frame
+                        row = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+                        row.pack(anchor='w', fill='x', padx=15, pady=3)
+                        
+                        # Command label
+                        cmd_label = ctk.CTkLabel(row, text=label, width=self.button_width*4, anchor='w')
+                        cmd_label.pack(side='left', padx=(0,10))
+                        
+                        # Action buttons
                         for act in actions:
                             act_name = act.get('name', 'action')
-                            btn = ttk.Button(row, text=act_name, width=6,
-                                             command=lambda a=act, base=cmd, lab=(group.get('name','Group'), sg_name, label, act_name): self.execute_action(base, a, lab))
-                            btn.pack(side='left', padx=(6 if act is actions[0] else 2,2))
+                            btn = ctk.CTkButton(row, text=act_name, width=60,
+                                              font=ctk.CTkFont(weight="bold", size=12),
+                                              command=lambda a=act, base=cmd, lab=(group_name, sg_name, label, act_name): self.execute_action(base, a, lab))
+                            btn.pack(side='left', padx=3)
             else:
                 for cmd in group.get('commands', []):
                     if not cmd.get('enabled', True):
                         continue
                     label = cmd.get('label', 'Unnamed')
                     actions = cmd.get('actions', [])
-                    row = ttk.Frame(inner)
-                    row.pack(anchor='w', fill='x', padx=6, pady=4)
-                    ttk.Label(row, text=label, width=self.button_width, anchor='w').pack(side='left')
+                    
+                    # Command row frame
+                    row = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+                    row.pack(anchor='w', fill='x', padx=10, pady=3)
+                    
+                    # Command label
+                    cmd_label = ctk.CTkLabel(row, text=label, width=self.button_width*4, anchor='w')
+                    cmd_label.pack(side='left', padx=(0,10))
+                    
+                    # Action buttons
                     for act in actions:
                         act_name = act.get('name', 'action')
-                        btn = ttk.Button(row, text=act_name, width=6,
-                                         command=lambda a=act, base=cmd, lab=(group.get('name','Group'), None, label, act_name): self.execute_action(base, a, lab))
-                        btn.pack(side='left', padx=(6 if act is actions[0] else 2,2))
+                        btn = ctk.CTkButton(row, text=act_name, width=60,
+                                          font=ctk.CTkFont(weight="bold", size=12),
+                                          command=lambda a=act, base=cmd, lab=(group_name, None, label, act_name): self.execute_action(base, a, lab))
+                        btn.pack(side='left', padx=3)
 
-        # Settings Tab (placed at the end)
-        settings_frame = ttk.Frame(notebook)
-        notebook.add(settings_frame, text='Settings')
+        # Settings Tab
+        settings_tab = tabview.add('Settings')
+        settings_scroll = ctk.CTkScrollableFrame(settings_tab)
+        settings_scroll.pack(fill='both', expand=True, padx=5, pady=5)
         
-        # Settings content
-        settings_inner = ttk.Frame(settings_frame)
-        settings_inner.pack(fill='both', expand=True, padx=20, pady=20)
-        
-        # Title
-        ttk.Label(settings_inner, text='Settings', font=('Segoe UI', 12, 'bold')).pack(anchor='w', pady=(0, 15))
         
         # Advanced setting (Config Test)
-        test_frame = ttk.LabelFrame(settings_inner, text='Advanced', padding=10)
-        test_frame.pack(fill='x', pady=(0, 15))
-        test_btn = ttk.Button(test_frame, text='Run Config Test', command=self.run_tests)
-        test_btn.pack(anchor='w')
-        ttk.Label(test_frame, text='Validate paths and executables in configuration', 
-                  foreground='#666').pack(anchor='w', padx=20, pady=(5, 0))
+        test_frame = ctk.CTkFrame(settings_scroll)
+        test_frame.pack(fill='x', padx=10, pady=(0, 15))
         
-        # Configuration setting (Record Log & Close on Action)
-        log_frame = ttk.LabelFrame(settings_inner, text='Configuration', padding=10)
-        log_frame.pack(fill='x', pady=(0, 15))
-        self.record_log_var = tk.BooleanVar(value=self.record_log)
-        log_cb = ttk.Checkbutton(log_frame, text='Enable logging', 
-                                 variable=self.record_log_var, command=self._toggle_record_log)
-        log_cb.pack(anchor='w')
+        test_header = ctk.CTkLabel(test_frame, text='Advanced', font=ctk.CTkFont(size=16, weight="bold"))
+        test_header.pack(anchor='w', padx=10, pady=(10, 5))
         
-        self.close_on_action_var = tk.BooleanVar(value=self.close_on_action)
-        close_cb = ttk.Checkbutton(log_frame, text='Close window after action (One-shot mode)', 
-                                    variable=self.close_on_action_var, command=self._toggle_close_on_action)
-        close_cb.pack(anchor='w', pady=(5, 0))
+        test_btn = ctk.CTkButton(test_frame, text='Run Config Test', command=self.run_tests, width=150,
+                                font=ctk.CTkFont(weight="bold"))
+        test_btn.pack(anchor='w', padx=10, pady=(0, 5))
+        
+        test_desc = ctk.CTkLabel(test_frame, text='Validate paths and executables in configuration', 
+                                text_color="gray50", font=ctk.CTkFont(size=14))
+        test_desc.pack(anchor='w', padx=30, pady=(0, 10))
+        
+        # Configuration settings
+        config_frame = ctk.CTkFrame(settings_scroll)
+        config_frame.pack(fill='x', padx=10, pady=(0, 15))
+        
+        config_header = ctk.CTkLabel(config_frame, text='Configuration', font=ctk.CTkFont(size=16, weight="bold"))
+        config_header.pack(anchor='w', padx=10, pady=(10, 10))
+        
+        # Record Log checkbox
+        self.record_log_var = ctk.BooleanVar(value=self.record_log)
+        log_cb = ctk.CTkCheckBox(config_frame, text='Enable logging', 
+                                variable=self.record_log_var, command=self._toggle_record_log)
+        log_cb.pack(anchor='w', padx=10, pady=5)
+        
+        # Close on Action checkbox
+        self.close_on_action_var = ctk.BooleanVar(value=self.close_on_action)
+        close_cb = ctk.CTkCheckBox(config_frame, text='One-shot mode (Close window after action)', 
+                                   variable=self.close_on_action_var, command=self._toggle_close_on_action)
+        close_cb.pack(anchor='w', padx=10, pady=(5, 10))
 
     def execute_action(self, base_cmd: Dict[str, Any], action: Dict[str, Any], label_tuple=None):
         """Execute an action with generic variable substitution.
@@ -376,14 +320,20 @@ class CommandBoardApp(tk.Tk):
         if not missing_paths and not missing_execs:
             messagebox.showinfo('Config Test', 'All OK!\n\n' + summary)
         else:
-            # Show detailed window
-            win = tk.Toplevel(self)
+            # Show detailed window using CustomTkinter
+            win = ctk.CTkToplevel(self)
             win.title('Config Test Report')
-            txt = tk.Text(win, width=100, height=30)
-            txt.pack(fill='both', expand=True)
+            win.geometry('800x600')
+            
+            # Use CTkTextbox for CustomTkinter
+            txt = ctk.CTkTextbox(win, width=780, height=540)
+            txt.pack(fill='both', expand=True, padx=10, pady=(10, 5))
             txt.insert('1.0', summary)
-            txt.config(state='disabled')
-            ttk.Button(win, text='Close', command=win.destroy).pack(pady=6)
+            txt.configure(state='disabled')
+            
+            close_btn = ctk.CTkButton(win, text='Close', command=win.destroy, width=100,
+                                     font=ctk.CTkFont(weight="bold"))
+            close_btn.pack(pady=(5, 10))
 
 
 def load_config(path: str) -> Dict[str, Any]:

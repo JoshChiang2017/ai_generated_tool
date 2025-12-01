@@ -5,28 +5,24 @@ Search for commits with specific messages across multiple Git/SVN repositories.
 
 import os
 import sys
-import json
 import subprocess
 import argparse
 from pathlib import Path
 from typing import List, Dict
 
+# Configuration
+REPOSITORIES = [
+    "D:\\work\\Grace\\code\\git2",
+    "D:\\work\\Grace\\code\\g56\\trunk\\Board\\Nvidia\\ServerMultiBoardPkg",
+    "D:\\work\\Grace\\code\\g56\\trunk\\Nvidia",
+    "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\VeraMultiBoardPkg",
+    "D:\\work\\Grace\\code\\vera\\vera_trunk\\Nvidia",
+    "D:\\work\\Grace\\code\\old_repo\\svn_Grace_56",
+    "D:\\work\\Grace\\code\\old_repo\\svn-Grace",
+    "D:\\work\\Grace\\code\\old_repo\\svn-Jetson"
+]
 
-def load_config(config_file: str = "search_commit_msg.json") -> Dict:
-    """Load configuration from file"""
-    try:
-        with open(config_file, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-            # Set defaults
-            if 'svn_log_limit' not in config:
-                config['svn_log_limit'] = 100
-            return config
-    except FileNotFoundError:
-        print(f"Error: Configuration file '{config_file}' not found")
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON in configuration file: {e}")
-        sys.exit(1)
+SVN_LOG_LIMIT = 200
 
 
 def is_git_repo(path: str) -> bool:
@@ -191,9 +187,7 @@ def print_results(repo_path: str, repo_type: str, commits: List[Dict], verbose: 
         print(f"  Message:")
         for line in message.split('\n'):
             print(f"    {line}")
-
-    print(f"")
-
+        print(f"")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -206,30 +200,24 @@ Examples:
     )
     
     parser.add_argument('search_term', help='Term to search for in commit messages')
-    parser.add_argument('-c', '--config', default='search_commit_msg.json',
-                        help='Configuration file with repository paths (default: search_commit_msg.json)')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Show detailed information (hash/revision, author, date)')
     
     args = parser.parse_args()
     
-    config = load_config(args.config)
-    repos = config.get('repositories', [])
-    svn_log_limit = config.get('svn_log_limit', 100)
-    
-    if not repos:
+    if not REPOSITORIES:
         print("Error: No repositories configured")
         sys.exit(1)
     
     if args.verbose:
         print(f"Searching for: '{args.search_term}'")
-        print(f"Repositories to search: {len(repos)}")
+        print(f"Repositories to search: {len(REPOSITORIES)}")
     
     total_commits = 0
     searched_repos = 0
     skipped_repos = 0
     
-    for repo_path in repos:
+    for repo_path in REPOSITORIES:
         if args.verbose:
             print(f"Searching: {repo_path}")
         
@@ -246,7 +234,7 @@ Examples:
             commits = search_git_commits(repo_path, args.search_term)
         elif is_svn_repo(repo_path):
             repo_type = 'svn'
-            commits = search_svn_commits(repo_path, args.search_term, svn_log_limit)
+            commits = search_svn_commits(repo_path, args.search_term, SVN_LOG_LIMIT)
         else:
             print(f"Skipping (not a Git/SVN repo): {repo_path}")
             skipped_repos += 1

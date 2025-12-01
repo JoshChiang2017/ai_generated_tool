@@ -205,8 +205,8 @@ def main():
     global DEBUG_MODE
     
     parser = argparse.ArgumentParser(description='Memory Map Visualizer')
-    parser.add_argument('--file', '-f', default='data.csv', 
-                       help='CSV file containing memory region data (default: data.csv)')
+    parser.add_argument('--file', '-f', default='memory_map_visualizer.csv', 
+                       help='CSV file containing memory region data (default: memory_map_visualizer.csv)')
     parser.add_argument('--debug', '-d', action='store_true',
                        help='Print debug information including filtered CSV content')
     args = parser.parse_args()

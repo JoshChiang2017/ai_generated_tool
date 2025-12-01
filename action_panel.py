@@ -111,7 +111,7 @@ def get_application_path():
         # Running as script - use script directory
         return os.path.dirname(os.path.abspath(__file__))
 
-CONFIG_FILE = os.path.join(get_application_path(), 'command_config.json')
+CONFIG_FILE = os.path.join(get_application_path(), 'action_panel.json')
 
 def resolve_log_path(settings: Dict[str, Any]) -> str:
     """Anchor log file to application directory if relative."""

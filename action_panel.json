@@ -1,26 +1,26 @@
 {
   "groups": [
     {
-      "name": "git",
+      "name": "GIT",
       "description": "Quick access to git log across multiple repositories",
       "subgroups": [
         {
           "name": "Grace",
           "commands": [
             {
-              "label": "code",
+              "label": "Code",
               "path": "D:\\work\\Grace\\code\\git2",
               "enabled": true,
               "actions": [
                 {
-                  "name": "folder",
-                  "executable": "explorer",
-                  "argsTemplate": "{path}"
-                },
-                {
                   "name": "BUILD",
                   "executable": "cmd",
                   "argsTemplate": "/C start /D {path}\\Board\\ServerMultiBoardPkg ProjectBuild.bat"
+                },
+                {
+                  "name": "folder",
+                  "executable": "explorer",
+                  "argsTemplate": "{path}"
                 }
               ]
             },
@@ -30,14 +30,14 @@
               "enabled": true,
               "actions": [
                 {
-                  "name": "log",
-                  "executable": "TortoiseGitProc",
-                  "argsTemplate": "/command:log /path:{path}"
-                },
-                {
                   "name": "bash",
                   "executableAlias": "git_bash",
                   "argsTemplate": "--cd={path}"
+                },
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
                 }
               ]
             }
@@ -47,31 +47,19 @@
           "name": "vera",
           "commands": [
             {
-              "label": "code",
+              "label": "Code",
               "path": "D:\\work\\Grace\\code\\vera\\vera_trunk",
               "enabled": true,
               "actions": [
                 {
-                  "name": "folder",
-                  "executable": "explorer",
-                  "argsTemplate": "{path}"
-                },
-                {
                   "name": "BUILD",
                   "executable": "cmd",
                   "argsTemplate": "/C start /D {path}\\Board\\Nvidia\\VeraMultiBoardPkg ProjectBuild.bat"
-                }
-              ]
-            },
-            {
-              "label": "Kernel",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
-              "enabled": true,
-              "actions": [
+                },
                 {
-                  "name": "revert",
-                  "executable": "git-insyde-helper.bat",
-                  "argsTemplate": "r {path}"
+                  "name": "folder",
+                  "executable": "explorer",
+                  "argsTemplate": "{path}"
                 }
               ]
             },
@@ -81,55 +69,67 @@
               "enabled": true,
               "actions": [
                 {
-                  "name": "log",
-                  "executable": "TortoiseGitProc",
-                  "argsTemplate": "/command:log /path:{path}"
-                },
-                {
                   "name": "bash",
                   "executableAlias": "git_bash",
                   "argsTemplate": "--cd={path}"
-                }
-              ]
-            },
-            {
-              "label": "stmm",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\StandaloneMmBoardPkg\\",
-              "enabled": true,
-              "actions": [
+                },
                 {
                   "name": "log",
                   "executable": "TortoiseGitProc",
                   "argsTemplate": "/command:log /path:{path}"
-                },
-                {
-                  "name": "bash",
-                  "executableAlias": "git_bash",
-                  "argsTemplate": "--cd={path}"
                 }
               ]
             },
             {
-              "label": "chipset",
+              "label": "Chipset",
               "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Nvidia\\",
               "enabled": true,
               "actions": [
                 {
+                  "name": "bash",
+                  "executableAlias": "git_bash",
+                  "argsTemplate": "--cd={path}"
+                },
+                {
                   "name": "log",
                   "executable": "TortoiseGitProc",
                   "argsTemplate": "/command:log /path:{path}"
-                },
+                }
+              ]
+            },
+            {
+              "label": "Kernel",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "Revert",
+                  "executable": "git-insyde-helper.bat",
+                  "argsTemplate": "r {path}"
+                }
+              ]
+            },
+            {
+              "label": "Stmm",
+              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\StandaloneMmBoardPkg\\",
+              "enabled": true,
+              "actions": [
                 {
                   "name": "bash",
                   "executableAlias": "git_bash",
                   "argsTemplate": "--cd={path}"
+                },
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
                 }
               ]
             }
           ]
         },
         {
-          "name": "kernel",
+          "name": "Kernel",
           "commands": [
             {
               "label": "k5.5",
@@ -137,14 +137,14 @@
               "enabled": true,
               "actions": [
                 {
-                  "name": "log",
-                  "executable": "TortoiseGitProc",
-                  "argsTemplate": "/command:log /path:{path}"
-                },
-                {
                   "name": "bash",
                   "executableAlias": "git_bash",
                   "argsTemplate": "--cd={path}"
+                },
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
                 }
               ]
             },
@@ -154,14 +154,14 @@
               "enabled": true,
               "actions": [
                 {
-                  "name": "log",
-                  "executable": "TortoiseGitProc",
-                  "argsTemplate": "/command:log /path:{path}"
-                },
-                {
                   "name": "bash",
                   "executableAlias": "git_bash",
                   "argsTemplate": "--cd={path}"
+                },
+                {
+                  "name": "log",
+                  "executable": "TortoiseGitProc",
+                  "argsTemplate": "/command:log /path:{path}"
                 }
               ]
             }
@@ -170,7 +170,7 @@
       ]
     },
     {
-      "name": "folder",
+      "name": "Folder",
       "description": "Open frequently used folders",
       "subgroups": [
         {

@@ -44,3 +44,20 @@ python action_panel.py actions_config.json
 ```
 
 ---
+
+# Private Tools
+A set of private utilities for internal use.  
+
+---
+Search Commit Messages Across Repositories
+```bash
+python search_commit_msg.py IBxxxx0001
+```
+
+---
+Reordering module order in the build report
+```bash
+python reorder_buildreport.py Report1.txt Report2.txt
+```
+
+---

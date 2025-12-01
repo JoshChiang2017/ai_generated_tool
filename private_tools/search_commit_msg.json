@@ -1,0 +1,13 @@
+{
+  "repositories": [
+    "D:\\work\\Grace\\code\\git2",
+    "D:\\work\\Grace\\code\\g56\\trunk\\Board\\Nvidia\\ServerMultiBoardPkg",
+    "D:\\work\\Grace\\code\\g56\\trunk\\Nvidia",
+    "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\VeraMultiBoardPkg",
+    "D:\\work\\Grace\\code\\vera\\vera_trunk\\Nvidia",
+    "D:\\work\\Grace\\code\\old_repo\\svn_Grace_56",
+    "D:\\work\\Grace\\code\\old_repo\\svn-Grace",
+    "D:\\work\\Grace\\code\\old_repo\\svn-Jetson"
+  ],
+  "svn_log_limit": 200
+}

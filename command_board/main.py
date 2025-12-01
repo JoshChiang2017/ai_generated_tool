@@ -3,23 +3,104 @@ import os
 import subprocess
 import sys
 import shutil
-import customtkinter as ctk
-from tkinter import messagebox
-from typing import Dict, Any, List, Tuple, Set
+try:
+    import customtkinter as ctk
+    from tkinter import messagebox
+except Exception:
+    ctk = None  # GUI not available in CLI-only environments
+    class _MsgBoxFallback:
+        @staticmethod
+        def showerror(title, msg):
+            print(f"ERROR: {title}: {msg}", file=sys.stderr)
+        @staticmethod
+        def showinfo(title, msg):
+            print(f"INFO: {title}: {msg}")
+    messagebox = _MsgBoxFallback()
+from typing import Dict, Any, List, Tuple, Set, Optional
 import argparse
-from action_logger import get_logger
 
-# Set appearance mode and color theme
-ctk.set_appearance_mode("System")  # Modes: "System", "Dark", "Light"
-ctk.set_default_color_theme("dark-blue")  # Themes: "blue", "green", "dark-blue"
+# Inlined from action_logger.py
+import datetime
+
+class ActionLogger:
+    def __init__(self, log_file: str):
+        self.log_file = log_file
+        os.makedirs(os.path.dirname(log_file) or '.', exist_ok=True)
+
+    def log(self, event: str, detail: str = '', status: str = 'OK'):
+        ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        line = f"{ts}\t{status}\t{event}\t{detail}\n"
+        try:
+            with open(self.log_file, 'a', encoding='utf-8') as f:
+                f.write(line)
+                f.flush()
+        except Exception:
+            pass
+
+_default_logger: Optional[ActionLogger] = None
+
+def get_logger(log_path: str) -> ActionLogger:
+    global _default_logger
+    if _default_logger is None or _default_logger.log_file != log_path:
+        _default_logger = ActionLogger(log_path)
+    return _default_logger
+
+# Set appearance mode and color theme (if GUI available)
+if ctk:
+    ctk.set_appearance_mode("System")
+    ctk.set_default_color_theme("dark-blue")
 
 # CustomTkinter has built-in tooltip support via CTkToolTip (optional)
 # For now, we'll skip tooltips or use simple approach
 
-try:
-    from core import CommandBuilder
-except ImportError:
-    CommandBuilder = None  # type: ignore
+# Inlined from core.py
+_RESERVED = {'executable', 'executableAlias', 'argsTemplate'}
+
+class CommandBuilder:
+    def __init__(self, cmd_def: Dict):
+        self.cmd_def = cmd_def
+
+    def _variables(self) -> Dict:
+        return {k: v for k, v in self.cmd_def.items() if k not in _RESERVED}
+
+    def build(self) -> str:
+        import re
+        exe = self.cmd_def.get('executable') or self.cmd_def.get('executableAlias')
+        template = (self.cmd_def.get('argsTemplate') or '').strip()
+        if not exe:
+            raise ValueError('Executable missing')
+        if not template:
+            return exe.strip()
+        vars_dict = self._variables()
+        placeholders = set(re.findall(r'{([a-zA-Z0-9_]+)}', template))
+        missing = [p for p in placeholders if p not in vars_dict]
+        if missing:
+            raise ValueError(f'Missing variables for template: {", ".join(missing)}')
+        try:
+            args = template.format(**vars_dict)
+        except KeyError as e:
+            raise ValueError(f'Variable missing during format: {e.args[0]}')
+        return f"{exe} {args}".strip()
+
+    @staticmethod
+    def validate(cmd_def: Dict) -> None:
+        import re
+        exe = cmd_def.get('executable') or cmd_def.get('executableAlias')
+        if not exe:
+            raise ValueError('executable is required')
+        template = (cmd_def.get('argsTemplate') or '').strip()
+        if not template:
+            return
+        vars_dict = {k: v for k, v in cmd_def.items() if k not in _RESERVED}
+        placeholders = set(re.findall(r'{([a-zA-Z0-9_]+)}', template))
+        missing = [p for p in placeholders if p not in vars_dict]
+        if missing:
+            raise ValueError(f'Variables missing: {", ".join(missing)}')
+        for name in placeholders:
+            val = vars_dict.get(name)
+            if isinstance(val, str) and len(val) > 2 and val[1] == ':' and ('\\' in val or '/' in val):
+                if not os.path.exists(val):
+                    pass
 
 def get_application_path():
     """Get the directory where the application/script is located."""
@@ -42,7 +123,7 @@ def resolve_log_path(settings: Dict[str, Any]) -> str:
         return raw
     return os.path.join(app_dir, raw)
 
-class CommandBoardApp(ctk.CTk):
+class CommandBoardApp(ctk.CTk if ctk else object):
     def __init__(self, config: Dict[str, Any], config_path: str = CONFIG_FILE):
         super().__init__()
         settings = config.get('settings', {})
@@ -83,7 +164,8 @@ class CommandBoardApp(ctk.CTk):
 
 
     def _build_ui(self):
-        # Create tabview for groups (CustomTkinter uses CTkTabview instead of Notebook)
+        if not ctk:
+            raise RuntimeError('GUI components are unavailable. Install customtkinter to use GUI.')
         tabview = ctk.CTkTabview(self)
         tabview.pack(fill='both', expand=True, padx=10, pady=10)
         # Configure tab button font size
@@ -320,7 +402,9 @@ class CommandBoardApp(ctk.CTk):
         if not missing_paths and not missing_execs:
             messagebox.showinfo('Config Test', 'All OK!\n\n' + summary)
         else:
-            # Show detailed window using CustomTkinter
+            if not ctk:
+                messagebox.showerror('Config Test', summary)
+                return
             win = ctk.CTkToplevel(self)
             win.title('Config Test Report')
             win.geometry('800x600')
@@ -491,22 +575,8 @@ def resolve_git_bash_executable(config: Dict[str, Any]) -> str:
 
 def build_command_string(cmd_def: Dict[str, Any]) -> str:
     """Build command using generic variables with CommandBuilder."""
-    if CommandBuilder:
-        return CommandBuilder(dict(cmd_def)).build()
-    exe = cmd_def.get('executable') or cmd_def.get('executableAlias')
-    template = (cmd_def.get('argsTemplate') or '').strip()
-    if not exe:
-        raise ValueError('Executable missing')
-    if not template:
-        return exe.strip()
-    import re
-    vars_ctx = {k: v for k, v in cmd_def.items() if k not in {'executable','executableAlias','argsTemplate'}}
-    placeholders = set(re.findall(r'{([a-zA-Z0-9_]+)}', template))
-    missing = [p for p in placeholders if p not in vars_ctx]
-    if missing:
-        raise ValueError(f'Missing variables: {", ".join(missing)}')
-    args = template.format(**vars_ctx)
-    return f"{exe} {args}".strip()
+    # Always use CommandBuilder since it's now inlined
+    return CommandBuilder(dict(cmd_def)).build()
 
 def resolve_executable(action: Dict[str, Any], config: Dict[str, Any], logger=None) -> str:
     """Return executable path resolving alias if present."""
@@ -641,6 +711,12 @@ def main(argv: List[str]):
             sys.exit(3)
         return
 
+    # GUI mode: only create app if customtkinter is available
+    if not ctk:
+        print('ERROR: GUI mode requires customtkinter. Install with: pip install customtkinter', file=sys.stderr)
+        print('Or use CLI options: -l (list), -r (run), -t (test)', file=sys.stderr)
+        sys.exit(1)
+    
     # If one-shot provided, force closeOnAction true
     if getattr(args, 'one_shot', False):
         config.setdefault('settings', {})['closeOnAction'] = True

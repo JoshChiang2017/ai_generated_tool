@@ -22,7 +22,7 @@ python <tool_name>.py
 
 A tool for generating and visualizing memory layout mappings, particularly useful in firmware development.
 
-![Memory Map Visualization Pic](docs/images/memory_map_visualizer.png)
+<img src="docs/images/memory_map_visualizer.png" height="300">
 
 **Usage**:
 ```bash
@@ -36,7 +36,7 @@ python memory_map_visualizer.py -f memory_map_visualizer.csv
 
 A quick action launcher for multiple repositories and folders, supporting Git logs, Git Bash, helper scripts, and folder opening, all driven by a JSON config.
 
-![Action Panel Pic](docs/images/action_panel.png)
+<img src="docs/images/action_panel.png" height="300">
 
 **Usage**:
 ```bash

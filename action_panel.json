@@ -1,14 +1,25 @@
 {
-  "groups": [
+  "settings": {
+    "windowTitle": "Command Board",
+    "buttonWidth": 30,
+    "recordLog": false,
+    "logFile": "action.log",
+    "closeOnAction": false,
+    "windowSize": "400x500"
+  },
+  "aliases": {
+    "git_bash": "C:\\Program Files\\Git\\git-bash.exe"
+  },
+  "pages": [
     {
       "name": "GIT",
       "description": "Quick access to git log across multiple repositories",
-      "subgroups": [
+      "groups": [
         {
           "name": "Grace",
-          "commands": [
+          "labels": [
             {
-              "label": "Code",
+              "name": "Code",
               "path": "D:\\work\\Grace\\code\\git2",
               "enabled": true,
               "actions": [
@@ -16,16 +27,11 @@
                   "name": "BUILD",
                   "executable": "cmd",
                   "argsTemplate": "/C start /D {path}\\Board\\ServerMultiBoardPkg ProjectBuild.bat"
-                },
-                {
-                  "name": "folder",
-                  "executable": "explorer",
-                  "argsTemplate": "{path}"
                 }
               ]
             },
             {
-              "label": "Board",
+              "name": "Board",
               "path": "D:\\work\\Grace\\code\\git2\\",
               "enabled": true,
               "actions": [
@@ -44,11 +50,11 @@
           ]
         },
         {
-          "name": "vera",
-          "commands": [
+          "name": "Vera",
+          "labels": [
             {
-              "label": "Code",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk",
+              "name": "Code",
+              "path": "D:\\vera\\trunk",
               "enabled": true,
               "actions": [
                 {
@@ -57,15 +63,23 @@
                   "argsTemplate": "/C start /D {path}\\Board\\Nvidia\\VeraMultiBoardPkg ProjectBuild.bat"
                 },
                 {
-                  "name": "folder",
-                  "executable": "explorer",
-                  "argsTemplate": "{path}"
+                  "name": "all bash",
+                  "commands": [
+                    {
+                      "executableAlias": "git_bash",
+                      "argsTemplate": "--cd={path}\\Board\\Nvidia\\VeraMultiBoardPkg"
+                    },
+                    {
+                      "executableAlias": "git_bash",
+                      "argsTemplate": "--cd={path}\\Nvidia"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "label": "Board",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\VeraMultiBoardPkg\\",
+              "name": "Board",
+              "path": "D:\\vera\\trunk\\Board\\Nvidia\\VeraMultiBoardPkg\\",
               "enabled": true,
               "actions": [
                 {
@@ -81,8 +95,8 @@
               ]
             },
             {
-              "label": "Chipset",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Nvidia\\",
+              "name": "Chipset",
+              "path": "D:\\vera\\trunk\\Nvidia\\",
               "enabled": true,
               "actions": [
                 {
@@ -98,8 +112,8 @@
               ]
             },
             {
-              "label": "Kernel",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\",
+              "name": "Kernel",
+              "path": "D:\\vera\\trunk\\",
               "enabled": true,
               "actions": [
                 {
@@ -110,8 +124,8 @@
               ]
             },
             {
-              "label": "Stmm",
-              "path": "D:\\work\\Grace\\code\\vera\\vera_trunk\\Board\\Nvidia\\StandaloneMmBoardPkg\\",
+              "name": "Stmm",
+              "path": "D:\\vera\\trunk\\Board\\Nvidia\\StandaloneMmBoardPkg\\",
               "enabled": true,
               "actions": [
                 {
@@ -130,9 +144,9 @@
         },
         {
           "name": "Kernel",
-          "commands": [
+          "labels": [
             {
-              "label": "k5.5",
+              "name": "k5.5",
               "path": "D:\\work\\Insyde\\kernel\\k5.5\\",
               "enabled": true,
               "actions": [
@@ -149,7 +163,7 @@
               ]
             },
             {
-              "label": "k5.7",
+              "name": "k5.7",
               "path": "D:\\work\\Insyde\\kernel\\k5.7\\",
               "enabled": true,
               "actions": [
@@ -172,12 +186,12 @@
     {
       "name": "Folder",
       "description": "Open frequently used folders",
-      "subgroups": [
+      "groups": [
         {
           "name": "Grace",
-          "commands": [
+          "labels": [
             {
-              "label": "root",
+              "name": "root",
               "enabled": true,
               "actions": [
                 {
@@ -193,7 +207,7 @@
               ]
             },
             {
-              "label": "spec",
+              "name": "spec",
               "enabled": true,
               "actions": [
                 {
@@ -209,7 +223,7 @@
               ]
             },
             {
-              "label": "platform_info",
+              "name": "platform_info",
               "enabled": true,
               "actions": [
                 {
@@ -223,14 +237,30 @@
                   "argsTemplate": "D:\\work\\Grace\\generated_data\\platform\\"
                 }
               ]
+            },
+            {
+              "name": "code",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "root",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Grace\\code\\git2"
+                },
+                {
+                  "name": "Board",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\work\\Grace\\code\\git2\\Board\\ServerMultiBoardPkg"
+                }
+              ]
             }
           ]
         },
         {
-          "name": "vera",
-          "commands": [
+          "name": "Vera",
+          "labels": [
             {
-              "label": "root",
+              "name": "root",
               "enabled": true,
               "actions": [
                 {
@@ -246,7 +276,7 @@
               ]
             },
             {
-              "label": "spec",
+              "name": "spec",
               "enabled": true,
               "actions": [
                 {
@@ -262,7 +292,7 @@
               ]
             },
             {
-              "label": "platform_info",
+              "name": "platform_info",
               "enabled": true,
               "actions": [
                 {
@@ -276,19 +306,47 @@
                   "argsTemplate": "D:\\work\\Vera\\generated_data\\platform\\"
                 }
               ]
+            },
+            {
+              "name": "code",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "root",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\vera\\trunk"
+                },
+                {
+                  "name": "Board",
+                  "executable": "explorer",
+                  "argsTemplate": "D:\\vera\\trunk\\Board\\Nvidia\\VeraMultiBoardPkg"
+                }
+              ]
             }
           ]
         },
         {
-          "name": "kernel",
-          "commands": [
+          "name": "Other",
+          "labels": [
             {
-              "label": "code",
+              "name": "Kerenl Code",
               "path": "D:\\work\\Insyde\\kernel",
               "enabled": true,
               "actions": [
                 {
-                  "name": "folder",
+                  "name": "open",
+                  "executable": "explorer",
+                  "argsTemplate": "{path}"
+                }
+              ]
+            },
+            {
+              "name": "Action panel",
+              "path": "D:\\temp\\ai_generated_tool\\dist\\action_panel",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "open",
                   "executable": "explorer",
                   "argsTemplate": "{path}"
                 }
@@ -297,17 +355,29 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Other",
+      "description": "Open frequently used folders",
+      "groups": [
+        {
+          "name": "_",
+          "labels": [
+            {
+              "name": "AI Tools powershell",
+              "path": "D:\\temp\\ai_generated_tool\\private_tools",
+              "enabled": true,
+              "actions": [
+                {
+                  "name": "run",
+                  "executable": "powershell",
+                  "argsTemplate": "-Command Start-Process powershell -ArgumentList '-NoExit','-Command','Set-Location \"{path}\"'"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
-  ],
-  "settings": {
-    "windowTitle": "Command Board",
-    "buttonWidth": 30,
-    "recordLog": false,
-    "logFile": "action.log",
-    "closeOnAction": false,
-    "windowSize": "400x500"
-  },
-  "aliases": {
-    "git_bash": "C:\\Program Files\\Git\\git-bash.exe"
-  }
+  ]
 }

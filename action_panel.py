@@ -171,69 +171,69 @@ class CommandBoardApp(ctk.CTk if ctk else object):
         # Configure tab button font size
         tabview._segmented_button.configure(font=ctk.CTkFont(size=16))
 
-        for group in self.config_data.get('groups', []):
-            group_name = group.get('name', 'Group')
-            tab = tabview.add(group_name)
+        for page in self.config_data.get('pages', []):
+            page_name = page.get('name', 'Page')
+            tab = tabview.add(page_name)
             
             # Use CTkScrollableFrame for scrollable content
             scroll_frame = ctk.CTkScrollableFrame(tab)
             scroll_frame.pack(fill='both', expand=True, padx=5, pady=5)
             
-            desc = group.get('description')
+            desc = page.get('description')
             if desc:
                 desc_label = ctk.CTkLabel(scroll_frame, text=desc, text_color="gray50")
                 desc_label.pack(anchor='w', padx=10, pady=(5,10))
             
-            subgroups = group.get('subgroups')
-            if subgroups:
-                for sg in subgroups:
-                    sg_name = sg.get('name', 'subgroup')
-                    # Subgroup header
-                    header = ctk.CTkLabel(scroll_frame, text=sg_name, font=ctk.CTkFont(size=16, weight="bold"))
+            groups = page.get('groups')
+            if groups:
+                for grp in groups:
+                    grp_name = grp.get('name', 'group')
+                    # Group header
+                    header = ctk.CTkLabel(scroll_frame, text=grp_name, font=ctk.CTkFont(size=16, weight="bold"))
                     header.pack(anchor='w', padx=10, pady=(15,5))
                     
-                    for cmd in sg.get('commands', []):
-                        if not cmd.get('enabled', True):
+                    for lbl in grp.get('labels', []):
+                        if not lbl.get('enabled', True):
                             continue
-                        label = cmd.get('label', 'Unnamed')
-                        actions = cmd.get('actions', [])
+                        label_name = lbl.get('name', 'Unnamed')
+                        actions = lbl.get('actions', [])
                         
-                        # Command row frame
+                        # Label row frame
                         row = ctk.CTkFrame(scroll_frame, fg_color="transparent")
                         row.pack(anchor='w', fill='x', padx=15, pady=3)
                         
-                        # Command label
-                        cmd_label = ctk.CTkLabel(row, text=label, width=self.button_width*4, anchor='w')
-                        cmd_label.pack(side='left', padx=(0,10))
+                        # Label text
+                        lbl_widget = ctk.CTkLabel(row, text=label_name, width=self.button_width*4, anchor='w')
+                        lbl_widget.pack(side='left', padx=(0,10))
                         
                         # Action buttons
                         for act in actions:
                             act_name = act.get('name', 'action')
                             btn = ctk.CTkButton(row, text=act_name, width=60,
                                               font=ctk.CTkFont(weight="bold", size=12),
-                                              command=lambda a=act, base=cmd, lab=(group_name, sg_name, label, act_name): self.execute_action(base, a, lab))
+                                              command=lambda a=act, base=lbl, lab=(page_name, grp_name, label_name, act_name): self.execute_action(base, a, lab))
                             btn.pack(side='left', padx=3)
             else:
-                for cmd in group.get('commands', []):
-                    if not cmd.get('enabled', True):
+                for lbl in page.get('labels', []):
+                    if not lbl.get('enabled', True):
                         continue
-                    label = cmd.get('label', 'Unnamed')
-                    actions = cmd.get('actions', [])
+                    label_name = lbl.get('name', 'Unnamed')
+                    actions = lbl.get('actions', [])
                     
-                    # Command row frame
+                    # Label row frame
                     row = ctk.CTkFrame(scroll_frame, fg_color="transparent")
                     row.pack(anchor='w', fill='x', padx=10, pady=3)
                     
-                    # Command label
-                    cmd_label = ctk.CTkLabel(row, text=label, width=self.button_width*4, anchor='w')
-                    cmd_label.pack(side='left', padx=(0,10))
+                    # Label text
+                    lbl_widget = ctk.CTkLabel(row, text=label_name, width=self.button_width*4, anchor='w')
+                    lbl_widget.pack(side='left', padx=(0,10))
                     
                     # Action buttons
                     for act in actions:
                         act_name = act.get('name', 'action')
                         btn = ctk.CTkButton(row, text=act_name, width=60,
                                           font=ctk.CTkFont(weight="bold", size=12),
-                                          command=lambda a=act, base=cmd, lab=(group_name, None, label, act_name): self.execute_action(base, a, lab))
+                                          command=lambda a=act, base=lbl, lab=(page_name, None, label_name, act_name): self.execute_action(base, a, lab))
                         btn.pack(side='left', padx=3)
 
         # Settings Tab
@@ -279,23 +279,43 @@ class CommandBoardApp(ctk.CTk if ctk else object):
     def execute_action(self, base_cmd: Dict[str, Any], action: Dict[str, Any], label_tuple=None):
         """Execute an action with generic variable substitution.
 
-        Reserved keys: name, executable, executableAlias, argsTemplate, enabled, actions, label.
-        Any other key at command or action level becomes a variable usable in argsTemplate.
-        Action-level keys override command-level keys.
+        Reserved keys: name, executable, executableAlias, argsTemplate, enabled, actions, commands.
+        Any other key at label or action level becomes a variable usable in argsTemplate.
+        Action-level keys override label-level keys.
+        
+        If action contains 'commands' array, execute all commands sequentially.
         """
         act_name = action.get('name', 'action')
         if self.record_log:
             self.logger.log('BUTTON_CLICK', f'{label_tuple} -> {act_name}', status='INFO')
-        exe = resolve_executable(action, self.config_data, self.logger if self.record_log else None)
-        template = (action.get('argsTemplate') or '').strip()
-        reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','label'}
+        
+        # Check if action contains multiple commands
+        commands_list = action.get('commands')
+        if commands_list and isinstance(commands_list, list):
+            # Execute multiple commands sequentially
+            for idx, cmd in enumerate(commands_list):
+                self._execute_single_command(base_cmd, cmd, act_name, idx + 1, len(commands_list))
+        else:
+            # Execute single command (legacy format)
+            self._execute_single_command(base_cmd, action, act_name)
+        
+        if self.close_on_action:
+            if self.record_log:
+                self.logger.log('APP_CLOSE', 'Auto-close after execute action', status='INFO')
+            self.after(100, self.destroy)
+    
+    def _execute_single_command(self, base_cmd: Dict[str, Any], cmd_spec: Dict[str, Any], act_name: str, cmd_num: int = None, total_cmds: int = None):
+        """Execute a single command specification."""
+        exe = resolve_executable(cmd_spec, self.config_data, self.logger if self.record_log else None)
+        template = (cmd_spec.get('argsTemplate') or '').strip()
+        reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','commands'}
         vars_ctx = {k: v for k, v in base_cmd.items() if k not in reserved}
-        for k, v in action.items():
+        for k, v in cmd_spec.items():
             if k not in reserved:
                 vars_ctx[k] = v
         if not exe:
             if self.record_log:
-                self.logger.log('EXECUTE', f'MISSING executable {action}', status='ERROR')
+                self.logger.log('EXECUTE', f'MISSING executable {cmd_spec}', status='ERROR')
             messagebox.showerror('Error', f'Missing executable for action {act_name}')
             return
         try:
@@ -317,12 +337,9 @@ class CommandBoardApp(ctk.CTk if ctk else object):
                 subprocess.Popen(full_cmd, shell=True)
             else:
                 subprocess.Popen([exe])
+            cmd_label = f' (command {cmd_num}/{total_cmds})' if cmd_num is not None else ''
             if self.record_log:
-                self.logger.log('EXECUTE', full_cmd, status='OK')
-            if self.close_on_action:
-                if self.record_log:
-                    self.logger.log('APP_CLOSE', 'Auto-close after execute action', status='INFO')
-                self.after(100, self.destroy)
+                self.logger.log('EXECUTE', f'{act_name}{cmd_label}: {full_cmd}', status='OK')
         except Exception as e:
             if self.record_log:
                 self.logger.log('EXECUTE', f'{act_name} ERROR {e}', status='ERROR')
@@ -428,29 +445,29 @@ def load_config(path: str) -> Dict[str, Any]:
 
 def iter_commands(config: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
     out: List[Tuple[str, Dict[str, Any]]] = []
-    for group in config.get('groups', []):
-        gname = group.get('name', 'Group')
-        subgroups = group.get('subgroups')
-        if subgroups:
-            for sg in subgroups:
-                sgname = sg.get('name', 'subgroup')
-                for cmd in sg.get('commands', []):
-                    if not cmd.get('enabled', True):
+    for page in config.get('pages', []):
+        pname = page.get('name', 'Page')
+        groups = page.get('groups')
+        if groups:
+            for grp in groups:
+                grpname = grp.get('name', 'group')
+                for lbl in grp.get('labels', []):
+                    if not lbl.get('enabled', True):
                         continue
-                    label = cmd.get('label', 'Unnamed')
-                    for act in cmd.get('actions', []):
+                    label_name = lbl.get('name', 'Unnamed')
+                    for act in lbl.get('actions', []):
                         act_name = act.get('name', 'action')
-                        full_label = f"{gname}/{sgname}/{label}/{act_name}"
-                        out.append((full_label, {'_base': cmd, '_action': act}))
+                        full_label = f"{pname}/{grpname}/{label_name}/{act_name}"
+                        out.append((full_label, {'_base': lbl, '_action': act}))
         else:
-            for cmd in group.get('commands', []):
-                if not cmd.get('enabled', True):
+            for lbl in page.get('labels', []):
+                if not lbl.get('enabled', True):
                     continue
-                label = cmd.get('label', 'Unnamed')
-                for act in cmd.get('actions', []):
+                label_name = lbl.get('name', 'Unnamed')
+                for act in lbl.get('actions', []):
                     act_name = act.get('name', 'action')
-                    full_label = f"{gname}/{label}/{act_name}"
-                    out.append((full_label, {'_base': cmd, '_action': act}))
+                    full_label = f"{pname}/{label_name}/{act_name}"
+                    out.append((full_label, {'_base': lbl, '_action': act}))
     return out
 
 def _collect_executable(action: Dict[str, Any]) -> str:
@@ -470,7 +487,7 @@ def validate_config(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
     seen_execs: Set[str] = set()
     total_commands = 0
     total_actions = 0
-    reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','label'}
+    reserved = {'name','executable','executableAlias','argsTemplate','enabled','actions','commands'}
     for label, pair in iter_commands(config):
         total_actions += 1
         base = pair.get('_base', {})
@@ -546,20 +563,20 @@ def validate_config(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
                     if logger:
                         logger.log('CONFIG_TEST_EXEC_CHECK', f'{exe} | {found} | OK', status='OK')
     base_signatures: Set[str] = set()
-    for group in config.get('groups', []):
-        subgroups = group.get('subgroups')
-        if subgroups:
-            for sg in subgroups:
-                for cmd in sg.get('commands', []):
-                    if not cmd.get('enabled', True):
+    for page in config.get('pages', []):
+        groups = page.get('groups')
+        if groups:
+            for grp in groups:
+                for lbl in grp.get('labels', []):
+                    if not lbl.get('enabled', True):
                         continue
-                    sig = f"{cmd.get('label')}"
+                    sig = f"{lbl.get('name')}"
                     base_signatures.add(sig)
         else:
-            for cmd in group.get('commands', []):
-                if not cmd.get('enabled', True):
+            for lbl in page.get('labels', []):
+                if not lbl.get('enabled', True):
                     continue
-                sig = f"{cmd.get('label')}"
+                sig = f"{lbl.get('name')}"
                 base_signatures.add(sig)
     total_commands = len(base_signatures)
     return {

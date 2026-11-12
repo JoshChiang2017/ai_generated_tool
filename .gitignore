@@ -20,6 +20,7 @@ outputs/
 *.jpg
 *.pdf
 *.svg
+*.yaml
 
 # IDE
 .vscode/

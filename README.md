@@ -55,6 +55,12 @@ python search_commit_msg.py IBxxxx0001
 ```
 
 ---
+List commits not aligned between two branches (skip hashes recorded in config; `-a` show all, `-m` interactive marking)
+```bash
+python cherry_pick_check.py <repo_path> master <branch> [-c config.yaml] [-a] [-m]
+```
+
+---
 Reordering module order in the build report
 ```bash
 python reorder_buildreport.py Report1.txt Report2.txt
